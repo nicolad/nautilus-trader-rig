@@ -9,20 +9,19 @@
 
 use anyhow::{anyhow, Context, Result};
 use dotenvy::dotenv;
-use fs_extra::dir::{copy as copy_dir, CopyOptions};
 use rayon::prelude::*;
+use regex::Regex;
 use rig::prelude::*;
 use rig::{completion::Prompt, providers};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::ffi::OsStr;
 use std::fs;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::{SystemTime, UNIX_EPOCH};
-use tempfile::TempDir;
 use walkdir::WalkDir;
 
 mod config;
@@ -173,6 +172,9 @@ async fn run(cfg: &AutopatcherConfig) -> Result<()> {
     ensure_command_exists("cargo").context("`cargo` is required (install Rust toolchain)")?;
     println!("   ✅ cargo found");
 
+    println!("🔧 Configuring parallelism ({} jobs)...", cfg.jobs);
+    init_global_rayon(cfg.jobs);
+
     println!("🤖 Initializing DeepSeek client...");
     let client = DeepSeekClient::from_env()?;
     println!("   ✅ DeepSeek client ready");
@@ -183,7 +185,12 @@ async fn run(cfg: &AutopatcherConfig) -> Result<()> {
         println!("\n🔄 === Iteration {iter}/{} ===", cfg.max_iterations);
         println!("📸 Taking codebase snapshot...");
 
-        let files = snapshot_codebase(&cfg.target, cfg.snapshot_max_files, cfg.snapshot_max_bytes)?;
+        let files = snapshot_codebase_smart(
+            &cfg.target,
+            cfg.snapshot_max_files,
+            cfg.snapshot_max_bytes,
+            last_build_output.as_deref(),
+        )?;
         println!("   📝 Captured {} files", files.len());
         for (path, content) in &files {
             println!("      {} ({} bytes)", path, content.len());
@@ -438,43 +445,84 @@ struct CandidateEval {
     build_stderr: String,
 }
 
-/// Evaluate a candidate in a fresh temp copy of the project:
-/// 1) apply edits (atomic writes),
-/// 2) cargo check,
-/// 3) cargo test.
+/// Evaluate a candidate using git worktree for faster isolation:
+/// 1) create temporary worktree at HEAD,
+/// 2) apply edits (atomic writes),
+/// 3) cargo check with JSON output,
+/// 4) cargo test with JSON output.
 fn try_build_and_test_in_temp(cfg: &AutopatcherConfig, ps: &PatchSet) -> Result<CandidateEval> {
-    println!("      🗂️ Creating temp directory...");
-    let tmp = TempDir::new()?;
-    let td = tmp.path().to_path_buf();
-    println!("         📁 {}", td.display());
+    println!("      🌿 Creating temporary git worktree at HEAD...");
+    let worktrees_root = cfg.target.join(".autopatch_worktrees");
+    fs::create_dir_all(&worktrees_root)?;
+    let ts = SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis();
+    let name = format!("wt-{}-{}", std::process::id(), ts);
+    let wt_dir = worktrees_root.join(&name);
 
-    println!("      📋 Copying project to temp...");
-    let mut cp = CopyOptions::new();
-    cp.copy_inside = true;
-    cp.overwrite = true;
-    copy_dir(&cfg.target, &td, &cp).with_context(|| "Failed to copy target into temp dir")?;
-    println!("         ✅ Project copied");
+    // `git worktree add --detach <dir> HEAD`
+    let ok = Command::new("git")
+        .args(["worktree", "add", "--detach"])
+        .arg(&wt_dir)
+        .arg("HEAD")
+        .current_dir(&cfg.target)
+        .status()
+        .context("git worktree add failed")?
+        .success();
+    if !ok {
+        return Err(anyhow!("git worktree add failed"));
+    }
+    println!("         📁 {}", wt_dir.display());
 
-    println!("      ⚡ Applying patches...");
-    apply_patchset_atomic_only(&td, ps)?;
+    // Ensure cleanup even on early returns.
+    struct WorktreeGuard { repo: PathBuf, path: PathBuf }
+    impl Drop for WorktreeGuard {
+        fn drop(&mut self) {
+            let _ = Command::new("git")
+                .args(["worktree", "remove", "-f"])
+                .arg(&self.path)
+                .current_dir(&self.repo)
+                .status();
+            let _ = fs::remove_dir_all(&self.path);
+        }
+    }
+    let _guard = WorktreeGuard { repo: cfg.target.clone(), path: wt_dir.clone() };
+
+    println!("      ⚡ Applying patches in worktree...");
+    apply_patchset_atomic_only(&wt_dir, ps)?;
     println!("         ✅ Patches applied");
 
-    println!("      🔍 Running cargo check...");
-    let check_out = run_cargo_capture(&td, &["check"])?;
+    // Per-candidate target dir to avoid parallel lock contention.
+    let target_dir = wt_dir.join("target");
+    let target_dir_str = target_dir.to_string_lossy();
+    let envs = [("CARGO_TARGET_DIR", target_dir_str.as_ref())];
+
+    println!("      🔍 Running cargo check (JSON)...");
+    let check_out = run_cargo_capture_env(&wt_dir, &["check", "--message-format=json"], &envs)?;
     let check_ok = check_out.status.success();
-    let mut build_stderr = String::from_utf8_lossy(&check_out.stderr).to_string();
-    println!(
-        "         {} cargo check",
-        if check_ok { "✅" } else { "❌" }
-    );
+    let mut build_stderr = String::new();
+
+    // Capture a compact build log: prefer stdout (JSON) with a small tail; also include stderr.
+    let mut joined = String::new();
+    joined.push_str(&String::from_utf8_lossy(&check_out.stdout));
+    joined.push_str(&String::from_utf8_lossy(&check_out.stderr));
+    if joined.len() > 64 * 1024 {
+        joined = format!("{}[...truncated...]", &joined[joined.len() - 64 * 1024..]);
+    }
+    build_stderr.push_str(&joined);
+    println!("         {} cargo check", if check_ok { "✅" } else { "❌" });
 
     let tests_ok = if check_ok {
-        println!("      🧪 Running cargo test...");
-        let test_out = run_cargo_capture(&td, &["test"])?;
-        if !test_out.status.success() {
-            build_stderr.push_str(&String::from_utf8_lossy(&test_out.stderr));
-        }
+        println!("      🧪 Running cargo test (JSON)...");
+        let test_out = run_cargo_capture_env(&wt_dir, &["test", "--message-format=json"], &envs)?;
         let success = test_out.status.success();
+        if !success {
+            let mut tjoined = String::new();
+            tjoined.push_str(&String::from_utf8_lossy(&test_out.stdout));
+            tjoined.push_str(&String::from_utf8_lossy(&test_out.stderr));
+            if tjoined.len() > 64 * 1024 {
+                tjoined = format!("{}[...truncated...]", &tjoined[tjoined.len() - 64 * 1024..]);
+            }
+            build_stderr.push_str(&tjoined);
+        }
         println!("         {} cargo test", if success { "✅" } else { "❌" });
         success
     } else {
@@ -482,13 +530,24 @@ fn try_build_and_test_in_temp(cfg: &AutopatcherConfig, ps: &PatchSet) -> Result<
         false
     };
 
-    println!("      🧹 Cleaning up temp directory...");
+    Ok(CandidateEval { check_ok, tests_ok, build_stderr })
+}
 
-    Ok(CandidateEval {
-        check_ok,
-        tests_ok,
-        build_stderr,
-    })
+// Helper: like run_cargo_capture, but with extra env vars.
+fn run_cargo_capture_env(
+    root: &Path,
+    args: &[&str],
+    envs: &[(&str, &str)],
+) -> Result<std::process::Output> {
+    let mut cmd = Command::new("cargo");
+    cmd.args(args)
+        .current_dir(root)
+        .stderr(Stdio::piped())
+        .stdout(Stdio::piped());
+    for (k, v) in envs {
+        cmd.env(k, v);
+    }
+    Ok(cmd.output()?)
 }
 
 /// Transactionally apply a patch set to the real repo:
@@ -724,38 +783,145 @@ fn rollback_from_backups(root: &Path, backup_dir: &Path, plan: &PlannedEdits) ->
     Ok(())
 }
 
-/// Snapshot a bounded view of the codebase for the model context.
-fn snapshot_codebase(
+// NEW: prefer files with errors + locally changed files, then fall back.
+fn snapshot_codebase_smart(
     root: &Path,
     max_files: usize,
     max_bytes: usize,
+    last_build_output: Option<&str>,
 ) -> Result<BTreeMap<String, String>> {
-    let mut files: Vec<PathBuf> = vec![];
-    for entry in WalkDir::new(root)
+    // 1) Collect candidates in priority buckets.
+    let mut priority: Vec<PathBuf> = vec![];
+
+    // a) Files that errored in the last build (from JSON or human output).
+    let mut error_paths = HashSet::<PathBuf>::new();
+    if let Some(raw) = last_build_output {
+        // Try JSON lines first (from cargo --message-format=json)
+        for line in raw.lines() {
+            let trimmed = line.trim_start();
+            if trimmed.starts_with('{') {
+                if let Ok(msg) = parse_cargo_message_path(trimmed) {
+                    error_paths.extend(msg);
+                    continue;
+                }
+            }
+        }
+        // Fallback: scrape human diagnostics like " --> path:line:col"
+        error_paths.extend(extract_paths_from_human_diagnostics(raw));
+    }
+    // Keep only files existing under root.
+    let error_paths: Vec<PathBuf> = error_paths
+        .into_iter()
+        .filter(|p| p.exists())
+        .collect();
+
+    priority.extend(error_paths);
+
+    // b) Locally changed files (not committed yet).
+    let mut changed = git_changed_files(root)?;
+    priority.extend(changed.drain(..));
+
+    // c) Always include entry points / manifests.
+    let specials = ["Cargo.toml", "src/lib.rs", "src/main.rs"];
+    for sp in specials {
+        let p = root.join(sp);
+        if p.exists() {
+            priority.push(p);
+        }
+    }
+
+    // d) Fill with remaining Rust sources in a deterministic order.
+    let mut all_sources: Vec<PathBuf> = WalkDir::new(root)
         .into_iter()
         .filter_entry(|e| include_in_snapshot(e.path()))
         .filter_map(|e| e.ok())
-    {
-        let p = entry.path();
-        if p.is_file() && is_rust_source(p) {
-            files.push(p.to_path_buf());
+        .map(|e| e.into_path())
+        .filter(|p| p.is_file() && is_rust_source(p))
+        .collect();
+    all_sources.sort();
+
+    // Unique-ify while preserving priority order.
+    let mut seen = BTreeSet::<String>::new();
+    let mut ordered: Vec<PathBuf> = vec![];
+    for p in priority.into_iter().chain(all_sources.into_iter()) {
+        let rel = path_relative(root, &p);
+        if seen.insert(rel.clone()) {
+            ordered.push(p);
+            if seen.len() >= max_files {
+                break;
+            }
         }
     }
 
-    files.sort();
-    files.truncate(max_files);
-
-    let mut map = BTreeMap::new();
-    for p in files {
+    // Read/truncate
+    let mut map = BTreeMap::<String, String>::new();
+    for p in ordered {
         let rel = path_relative(root, &p);
         let mut content = fs::read_to_string(&p).unwrap_or_default();
         if content.len() > max_bytes {
-            content.truncate(max_bytes);
-            content.push_str("\n/* … truncated … */\n");
+            // keep head+tail to retain signatures + impls
+            let keep = max_bytes / 2;
+            let head = &content[..keep];
+            let tail = &content[content.len() - keep..];
+            content = format!("{head}\n/* … truncated … */\n{tail}");
         }
         map.insert(rel, content);
     }
+
     Ok(map)
+}
+
+// Parse a single cargo JSON message line to collect file paths of spans.
+fn parse_cargo_message_path(line: &str) -> Result<HashSet<PathBuf>> {
+    // Use cargo_metadata::Message if available.
+    let mut paths = HashSet::new();
+    if let Ok(msg) = serde_json::from_str::<cargo_metadata::Message>(line) {
+        if let cargo_metadata::Message::CompilerMessage(cm) = msg {
+            let diag = cm.message;
+            for span in diag.spans {
+                if let Some(file) = span.file_name.strip_prefix("./").or_else(|| Some(&span.file_name)) {
+                    paths.insert(PathBuf::from(file));
+                }
+            }
+        }
+    }
+    Ok(paths)
+}
+
+// Grep human diagnostics like " --> src/foo.rs:12:34"
+fn extract_paths_from_human_diagnostics(s: &str) -> HashSet<PathBuf> {
+    let mut out = HashSet::new();
+    // conservative regex: space+arrow, then path:line:col
+    let re = Regex::new(r" --> ([^\s:]+):\d+:\d+").unwrap();
+    for cap in re.captures_iter(s) {
+        if let Some(m) = cap.get(1) {
+            out.insert(PathBuf::from(m.as_str()));
+        }
+    }
+    out
+}
+
+// List changed (tracked or untracked) files relative to HEAD, like `git status --porcelain`.
+fn git_changed_files(root: &Path) -> Result<Vec<PathBuf>> {
+    let out = Command::new("git")
+        .args(["status", "--porcelain"])
+        .current_dir(root)
+        .stdout(Stdio::piped())
+        .output()
+        .context("git status --porcelain failed")?;
+
+    let mut files = Vec::<PathBuf>::new();
+    for line in String::from_utf8_lossy(&out.stdout).lines() {
+        // format: "XY path" or "?? path"
+        if line.len() >= 4 {
+            let path = line[3..].trim();
+            let p = root.join(path);
+            if p.exists() && is_rust_source(&p) {
+                files.push(p);
+            }
+        }
+    }
+    Ok(files)
 }
 
 fn include_in_snapshot(path: &Path) -> bool {
@@ -853,6 +1019,21 @@ fn git_commit(root: &Path, msg: &str) -> Result<()> {
 }
 
 fn git_push(root: &Path) -> Result<()> {
+    // Detect if we have an upstream, otherwise skip.
+    let has_upstream = Command::new("git")
+        .args(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"])
+        .current_dir(root)
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false);
+
+    if !has_upstream {
+        println!("ℹ️  No upstream configured; skipping `git push`.");
+        return Ok(());
+    }
+
     let ok = Command::new("git")
         .args(["push"])
         .current_dir(root)
@@ -862,6 +1043,13 @@ fn git_push(root: &Path) -> Result<()> {
         return Err(anyhow!("git push failed"));
     }
     Ok(())
+}
+
+fn init_global_rayon(jobs: usize) {
+    // Safe to call many times; only the first succeeds, others error and are ignored.
+    let _ = rayon::ThreadPoolBuilder::new()
+        .num_threads(jobs)
+        .build_global();
 }
 
 fn ensure_command_exists(name: &str) -> Result<()> {

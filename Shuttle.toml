@@ -1,0 +1,4 @@
+[package]
+name = "shuttle-cron-gh"
+description = "Blockchain repository cron job service that monitors GitHub issues"
+

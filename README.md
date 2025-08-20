@@ -1,4 +1,4 @@
-# nautilus_trader_rig_mcp
+# nautilus_trader_rig
 
 Small Rust client that:
 
