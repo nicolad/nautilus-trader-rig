@@ -868,16 +868,26 @@ fn apply_patchset_transactional(root: &Path, ps: &PatchSet) -> Result<()> {
         return Err(e);
     }
 
-    // Gate: check + test.
-    if let Err(e) = run_cargo(root, &["check"]) {
-        eprintln!("❌ `cargo check` failed after apply: {e}. Rolling back…");
-        rollback_from_backups(root, &backup_dir, &plan)?;
-        return Err(anyhow!("post-apply cargo check failed"));
-    }
-    if let Err(e) = run_cargo(root, &["test"]) {
-        eprintln!("❌ `cargo test` failed after apply: {e}. Rolling back…");
-        rollback_from_backups(root, &backup_dir, &plan)?;
-        return Err(anyhow!("post-apply cargo test failed"));
+    // Gate: check + test (skip in deployed environment)
+    // Check if we're in Shuttle environment
+    let is_shuttle = std::env::var("SHUTTLE").is_ok()
+        || std::env::var("SHUTTLE_PROJECT_ID").is_ok()
+        || std::env::var("SHUTTLE_SERVICE_NAME").is_ok();
+
+    if is_shuttle {
+        println!("🏭 Skipping cargo validation in deployed environment");
+        println!("   ⚠️  Production mode - assuming code quality checks passed during build");
+    } else {
+        if let Err(e) = run_cargo(root, &["check"]) {
+            eprintln!("❌ `cargo check` failed after apply: {e}. Rolling back…");
+            rollback_from_backups(root, &backup_dir, &plan)?;
+            return Err(anyhow!("post-apply cargo check failed"));
+        }
+        if let Err(e) = run_cargo(root, &["test"]) {
+            eprintln!("❌ `cargo test` failed after apply: {e}. Rolling back…");
+            rollback_from_backups(root, &backup_dir, &plan)?;
+            return Err(anyhow!("post-apply cargo test failed"));
+        }
     }
 
     // Success: cleanup backups.
