@@ -12,7 +12,6 @@
 use anyhow::{anyhow, Context, Result};
 use dotenvy::dotenv;
 use fs_extra::dir::{copy as copy_dir, CopyOptions};
-use log::{info, warn, error, debug};
 use rayon::prelude::*;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -264,36 +263,45 @@ Input:
             }
         }) {
             let ps = &parsed[i];
-            println!("✅ Candidate {i} compiles and tests pass: {}", ps.title);
+            println!("🏆 WINNER: Candidate {} - {}", i + 1, ps.title);
+            println!("   📋 Rationale: {}", ps.rationale);
 
-            // Apply to real repo transactionally and guard again with check + test.
+            println!("🔄 Applying patch to real repository...");
             apply_patchset_transactional(&cfg.target, ps)
                 .context("Failed to apply patchset transactionally to real repo")?;
+            println!("   ✅ Patch applied successfully");
 
-            // Commit only if the post-apply gates are green.
+            println!("📝 Committing changes...");
             ensure_git_repo(&cfg.target)?;
             git_add_all(&cfg.target)?;
-            git_commit(
-                &cfg.target,
-                &format!("{} [autopatch]\n\n{}", ps.title.trim(), ps.rationale.trim()),
-            )?;
-            println!("🎉 Committed (build + tests green).");
+            let commit_msg = format!("{} [autopatch]\n\n{}", ps.title.trim(), ps.rationale.trim());
+            git_commit(&cfg.target, &commit_msg)?;
+            println!("🎉 Committed successfully!");
+            println!("   💾 Commit message: {}", ps.title.trim());
 
             last_build_output = None;
         } else {
-            println!("No candidate passed both build and tests.");
+            println!("💔 No candidate passed both build and tests.");
+            println!("📝 Capturing build output for next iteration...");
+            
             // Capture a failing build log to feed back next time (best-effort on first candidate).
-            let _last_build_output = Some(
+            last_build_output = Some(
                 parsed
                     .get(0)
                     .and_then(|p| try_build_and_test_in_temp(&cfg, p).ok())
                     .map(|ce| ce.build_stderr)
                     .unwrap_or_default(),
             );
+            
+            if let Some(ref output) = last_build_output {
+                println!("   📋 Captured {} chars of build output", output.len());
+            }
             break;
         }
     }
 
+    println!("\n🏁 Autopatcher completed!");
+    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     Ok(())
 }
 
@@ -327,30 +335,43 @@ struct CandidateEval {
 /// 2) cargo check,
 /// 3) cargo test.
 fn try_build_and_test_in_temp(cfg: &Config, ps: &PatchSet) -> Result<CandidateEval> {
+    println!("      🗂️ Creating temp directory...");
     let tmp = TempDir::new()?;
     let td = tmp.path().to_path_buf();
+    println!("         📁 {}", td.display());
 
+    println!("      📋 Copying project to temp...");
     let mut cp = CopyOptions::new();
     cp.copy_inside = true;
     cp.overwrite = true;
     copy_dir(&cfg.target, &td, &cp).with_context(|| "Failed to copy target into temp dir")?;
+    println!("         ✅ Project copied");
 
-    // Atomic writes even in temp (keeps semantics identical).
+    println!("      ⚡ Applying patches...");
     apply_patchset_atomic_only(&td, ps)?;
+    println!("         ✅ Patches applied");
 
+    println!("      🔍 Running cargo check...");
     let check_out = run_cargo_capture(&td, &["check"])?;
     let check_ok = check_out.status.success();
     let mut build_stderr = String::from_utf8_lossy(&check_out.stderr).to_string();
+    println!("         {} cargo check", if check_ok { "✅" } else { "❌" });
 
     let tests_ok = if check_ok {
+        println!("      🧪 Running cargo test...");
         let test_out = run_cargo_capture(&td, &["test"])?;
         if !test_out.status.success() {
             build_stderr.push_str(&String::from_utf8_lossy(&test_out.stderr));
         }
-        test_out.status.success()
+        let success = test_out.status.success();
+        println!("         {} cargo test", if success { "✅" } else { "❌" });
+        success
     } else {
+        println!("         ⏭️ Skipping tests (check failed)");
         false
     };
+
+    println!("      🧹 Cleaning up temp directory...");
 
     Ok(CandidateEval {
         check_ok,
