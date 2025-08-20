@@ -109,6 +109,24 @@ mod tests {
     }
 
     #[test]
+    fn test_autopatcher_config_validation_edge_cases() {
+        let mut config = AutopatcherConfig::default();
+        
+        // Test temperature bounds (0.0 and 2.0 should be valid)
+        config.temperature = 0.0;
+        assert!(config.validate().is_ok(), "temperature=0.0 should be valid");
+        
+        config.temperature = 2.0;
+        assert!(config.validate().is_ok(), "temperature=2.0 should be valid");
+        
+        // Test minimum valid values
+        config.temperature = 0.1;
+        config.max_tokens = 1;
+        config.max_iterations = 1;
+        assert!(config.validate().is_ok(), "minimum valid values should pass");
+    }
+
+    #[test]
     fn test_config_from_env() {
         let config = Config::from_env();
         assert!(config.validate().is_ok(), "Config from env should be valid");

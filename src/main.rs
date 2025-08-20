@@ -396,16 +396,6 @@ Input:
     Ok(())
 }
 
-/// Strong system guidance for tiny, safe edits + tiny deterministic tests.
-const SYSTEM_PROMPT: &str = r#"
-You are a careful Rust engineer who makes micro-edits and adds tiny, deterministic tests.
-Rules:
-- Keep edits small, localized, and compilation-safe.
-- Prefer doc improvements, minor refactors, explicit imports/derives, and lint fixes.
-- Tests must be deterministic (no I/O, no sleeps, no randomness, no time).
-- When fixing a concrete error from the last build, add a focused test if it helps prevent regressions.
-"#;
-
 /// Policy the model receives inside the input blob.
 const POLICY_TEXT: &str = r#"
 Output strictly valid JSON for { "patches": PatchSet[] }.
