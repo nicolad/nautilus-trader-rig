@@ -134,7 +134,10 @@ async fn run_autopatcher_job() {
 
     match run_autopatcher().await {
         Ok(_) => {
-            println!("✅ Autopatcher job completed successfully at: {:?}", Utc::now());
+            println!(
+                "✅ Autopatcher job completed successfully at: {:?}",
+                Utc::now()
+            );
         }
         Err(e) => {
             eprintln!("❌ Autopatcher job failed at: {:?}", Utc::now());
@@ -194,13 +197,16 @@ impl shuttle_runtime::Service for MyService {
             println!("⏱️  Waiting for next interval...");
             interval.tick().await;
             println!("⏰ Timer triggered - running autopatcher job...");
-            
+
             // Run with timeout to prevent hanging
             let timeout_duration = Duration::from_secs(30 * 60); // 30 minutes timeout
             match tokio::time::timeout(timeout_duration, run_autopatcher_job()).await {
                 Ok(_) => println!("🔄 Job completed within timeout"),
                 Err(_) => {
-                    eprintln!("⚠️  Job timed out after {} seconds", timeout_duration.as_secs());
+                    eprintln!(
+                        "⚠️  Job timed out after {} seconds",
+                        timeout_duration.as_secs()
+                    );
                     eprintln!("⚠️  Continuing to next cycle...");
                 }
             }
@@ -210,26 +216,36 @@ impl shuttle_runtime::Service for MyService {
 
 async fn run_autopatcher() -> Result<()> {
     println!("📋 Starting run_autopatcher function...");
-    
+
     // Load environment variables from .env file
     dotenv().ok();
     println!("📋 Environment variables loaded with dotenv");
 
-    // Initialize logging with detailed output (only if not already initialized)
-    if std::env::var("RUST_LOG").is_err() {
-        std::env::set_var("RUST_LOG", "info");
-        println!("📋 Set RUST_LOG to info level");
-    }
+    // Initialize logging with detailed output (only if not running on Shuttle)
+    // Shuttle has its own tracing subscriber that conflicts with env_logger
+    let is_shuttle = std::env::var("SHUTTLE").is_ok() || 
+                     std::env::var("SHUTTLE_PROJECT_ID").is_ok() || 
+                     std::env::var("SHUTTLE_SERVICE_NAME").is_ok();
     
-    // Try to initialize logger, but ignore if it's already initialized (e.g., by Shuttle)
-    let logger_result = env_logger::Builder::from_default_env()
-        .filter_level(log::LevelFilter::Info)
-        .format_timestamp_secs()
-        .try_init();
-    
-    match logger_result {
-        Ok(_) => println!("📋 Logger initialized successfully"),
-        Err(_) => println!("📋 Logger already initialized (probably by Shuttle runtime)"),
+    if is_shuttle {
+        println!("📋 Running on Shuttle - skipping env_logger initialization");
+        println!("📋 Using Shuttle's built-in tracing subscriber");
+    } else {
+        println!("📋 Running locally - initializing env_logger");
+        if std::env::var("RUST_LOG").is_err() {
+            std::env::set_var("RUST_LOG", "info");
+            println!("📋 Set RUST_LOG to info level");
+        }
+
+        // Only initialize env_logger when NOT running on Shuttle
+        match env_logger::Builder::from_default_env()
+            .filter_level(log::LevelFilter::Info)
+            .format_timestamp_secs()
+            .try_init() 
+        {
+            Ok(_) => println!("📋 Logger initialized successfully"),
+            Err(e) => println!("📋 Logger initialization failed (probably already initialized): {}", e),
+        }
     }
 
     // Load configuration
@@ -281,7 +297,10 @@ async fn run_autopatcher() -> Result<()> {
 
     println!("📋 About to call run() function...");
     let result = run(&config).await;
-    println!("📋 run() function completed with result: {:?}", result.is_ok());
+    println!(
+        "📋 run() function completed with result: {:?}",
+        result.is_ok()
+    );
     result
 }
 
@@ -305,31 +324,41 @@ async fn run(config: &Config) -> Result<()> {
 
     println!("🤖 Initializing DeepSeek client...");
     println!("📋 Checking for DEEPSEEK_API_KEY environment variable...");
-    
+
     // List all environment variables for debugging
     println!("📋 Available environment variables:");
     for (key, value) in std::env::vars() {
         if key.contains("API") || key.contains("TOKEN") || key.contains("KEY") {
-            println!("   {}: {}", key, if value.len() > 10 { format!("{}...", &value[..10]) } else { "***".to_string() });
+            println!(
+                "   {}: {}",
+                key,
+                if value.len() > 10 {
+                    format!("{}...", &value[..10])
+                } else {
+                    "***".to_string()
+                }
+            );
         }
     }
-    
+
     if std::env::var("DEEPSEEK_API_KEY").is_err() {
         eprintln!("❌ DEEPSEEK_API_KEY environment variable not found");
         eprintln!("📋 Attempting to load from Secrets.toml through dotenv...");
-        
+
         // Try to load from .env file or current directory
         let _ = dotenvy::from_filename("Secrets.toml");
-        
+
         if std::env::var("DEEPSEEK_API_KEY").is_err() {
-            return Err(anyhow!("DEEPSEEK_API_KEY environment variable not set and not found in Secrets.toml"));
+            return Err(anyhow!(
+                "DEEPSEEK_API_KEY environment variable not set and not found in Secrets.toml"
+            ));
         } else {
             println!("   ✅ DEEPSEEK_API_KEY loaded from Secrets.toml");
         }
     } else {
         println!("   ✅ DEEPSEEK_API_KEY found in environment");
     }
-    
+
     let client = DeepSeekClient::from_env().context("Failed to create DeepSeek client")?;
     println!("   ✅ DeepSeek client ready");
 
