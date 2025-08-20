@@ -9,6 +9,8 @@ assets = [
   "Cargo.toml",          # Include cargo manifest
   "*.md",                # Include all markdown files
   "Cargo.lock",          # Include lock file
+  ".gitignore",          # Include gitignore file
+  ".git",
   "rust-toolchain.toml", # Include rust toolchain config
 ]
 
