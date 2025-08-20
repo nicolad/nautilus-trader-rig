@@ -1,301 +1,795 @@
-//! # Nautilus Trader MCP with Tiny-Change Protocol
-//!
-//! This application demonstrates a "tiny-change" protocol for code modifications using
-//! Model Context Protocol (MCP) with git operations. The tiny-change protocol enforces
-//! strict limits on patch sizes to ensure surgical, minimal code changes.
-//!
-//! ## Tiny-Change Protocol Rules:
-//! - Maximum 1 file per patch
-//! - Maximum 2 hunks per patch  
-//! - Maximum 20 total changed lines (additions + deletions)
-//! - No refactors, renames, or formatting-only changes
-//! - Preserve existing style and public APIs
-//!
-//! ## Functions:
-//! - `patch_metrics()`: Analyzes unified diff to count files, hunks, and changed lines
-//! - `enforce_patch_limits()`: Validates patches against tiny-change constraints
-//! - `apply_patch_with_limits()`: Guards patch application with size enforcement
-//! - `build_tiny_change_prompt()`: Generates Claude prompts with protocol rules
-//! - `run_test_command()`: Executes test commands for feedback loops
-//!
-//! ## Usage:
-//! ```bash
-//! cargo run
-//! ```
-//!
-//! This will demonstrate:
-//! 1. MCP connection to git server
-//! 2. Repository status checking
-//! 3. Tiny-change protocol enforcement examples
-//! 4. Valid patch acceptance
-//! 5. Oversized patch rejection
+// src/main.rs
+//
+// Self-improving Rust autopatcher that:
+// - uses Rig + DeepSeek to propose tiny code edits (incl. tiny deterministic tests),
+// - evaluates candidates in parallel in temp copies,
+// - applies a candidate to the real repo and commits ONLY if `cargo check` AND `cargo test` pass,
+// - avoids file corruption with transactional, atomic writes + backups + rollback.
+//
+// Requirements in Cargo.toml (not shown here; keep as in previous step):
+// anyhow, fs_extra, rayon, schemars, serde(+derive), tempfile, walkdir, which, rig-core
 
-use anyhow::Result;
-use rmcp::{
-    model::CallToolRequestParam,
-    service::ServiceExt,
-    transport::{ConfigureCommandExt, TokioChildProcess},
+use anyhow::{anyhow, Context, Result};
+use dotenvy::dotenv;
+use fs_extra::dir::{copy as copy_dir, CopyOptions};
+use log::{info, warn, error, debug};
+use rayon::prelude::*;
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
+use std::ffi::OsStr;
+use std::fs;
+use std::io::{Read, Write};
+use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
+use std::time::{SystemTime, UNIX_EPOCH};
+use tempfile::TempDir;
+use walkdir::WalkDir;
+
+use rig::{
+    client::{CompletionClient, ProviderClient},
+    completion::Prompt,
+    providers::deepseek::{self, DEEPSEEK_REASONER},
 };
-use tokio::process::Command;
 
-/// Metrics for patch analysis
-#[derive(Debug, Default, Clone, Copy)]
-struct PatchMetrics {
-    files: usize,
-    hunks: usize,
-    added: usize,
-    removed: usize,
-    changed: usize, // added + removed
+/// A small, conservative patch set that the model proposes.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+struct PatchSet {
+    /// Short title used as the commit summary.
+    title: String,
+    /// Human rationale (used in commit body).
+    rationale: String,
+    /// Concrete file edits.
+    edits: Vec<Edit>,
 }
 
-/// Count files, hunks, and changed lines in a unified diff.
-fn patch_metrics(diff: &str) -> PatchMetrics {
-    let mut m = PatchMetrics::default();
-    for line in diff.lines() {
-        if line.starts_with("diff --git ") {
-            m.files += 1;
-        } else if line.starts_with("@@") {
-            m.hunks += 1;
-        } else if line.starts_with('+') && !line.starts_with("+++") {
-            m.added += 1;
-        } else if line.starts_with('-') && !line.starts_with("---") {
-            m.removed += 1;
+/// Minimal, safe edit primitives.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(tag = "kind")]
+enum Edit {
+    /// Replace a file entirely (for new tiny tests/docs/small modules).
+    ReplaceFile { path: String, content: String },
+
+    /// Bounded search/replace (occurrences defaults to 1). Fails if `search` not found.
+    SearchReplace {
+        path: String,
+        search: String,
+        replace: String,
+        occurrences: Option<usize>,
+    },
+
+    /// Insert before first `anchor`. Fails if `anchor` not found.
+    InsertBefore {
+        path: String,
+        anchor: String,
+        insert: String,
+    },
+
+    /// Insert after first `anchor`. Fails if `anchor` not found.
+    InsertAfter {
+        path: String,
+        anchor: String,
+        insert: String,
+    },
+}
+
+/// Input we give the LLM: snapshot + last build log + desired candidate count.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct PlanningInput {
+    policy: String,
+    files: BTreeMap<String, String>,
+    last_build_output: Option<String>,
+    candidates: usize,
+}
+
+/// Minimal config — hardcoded (no flags).
+struct Config {
+    target: PathBuf,
+    candidates: usize,
+    iterations: usize,
+    jobs: usize,
+    snapshot_max_files: usize,
+    snapshot_max_bytes: usize,
+}
+
+fn main() -> Result<()> {
+    // Load environment variables from .env file
+    dotenv().ok();
+    
+    // Initialize logging with detailed output
+    env_logger::Builder::from_default_env()
+        .filter_level(log::LevelFilter::Info)
+        .format_timestamp_secs()
+        .init();
+
+    println!("🚀 Starting Rust Autopatcher with DeepSeek");
+    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+
+    let cfg = Config {
+        target: PathBuf::from("."),
+        candidates: 3,
+        iterations: 1,
+        jobs: 3,
+        snapshot_max_files: 40,
+        snapshot_max_bytes: 8_192,
+    };
+
+    println!("⚙️  Configuration:");
+    println!("   Target directory: {}", cfg.target.display());
+    println!("   Candidates per iteration: {}", cfg.candidates);
+    println!("   Max iterations: {}", cfg.iterations);
+    println!("   Parallel jobs: {}", cfg.jobs);
+    println!("   Max files in snapshot: {}", cfg.snapshot_max_files);
+    println!("   Max bytes per file: {}", cfg.snapshot_max_bytes);
+    println!();    let rt = tokio::runtime::Runtime::new()?;
+    rt.block_on(run(cfg))
+}
+
+async fn run(cfg: Config) -> Result<()> {
+    println!("🔍 Checking prerequisites...");
+    
+    ensure_command_exists("git").context("`git` is required in PATH")?;
+    println!("   ✅ git found");
+    
+    ensure_command_exists("cargo").context("`cargo` is required (install Rust toolchain)")?;
+    println!("   ✅ cargo found");
+
+    println!("🤖 Initializing DeepSeek client...");
+    let ds = deepseek::Client::from_env();
+    let agent = ds.agent(DEEPSEEK_REASONER).preamble(SYSTEM_PROMPT).build();
+    println!("   ✅ DeepSeek agent ready");
+
+    let mut last_build_output: Option<String> = None;
+
+    for iter in 1..=cfg.iterations {
+        println!("\n🔄 === Iteration {iter}/{} ===", cfg.iterations);
+        println!("📸 Taking codebase snapshot...");
+
+        let files = snapshot_codebase(&cfg.target, cfg.snapshot_max_files, cfg.snapshot_max_bytes)?;
+        println!("   📝 Captured {} files", files.len());
+        for (path, content) in &files {
+            println!("      {} ({} bytes)", path, content.len());
         }
-    }
-    m.changed = m.added + m.removed;
-    m
-}
+        
+        let input = PlanningInput {
+            policy: POLICY_TEXT.to_string(),
+            files,
+            last_build_output: last_build_output.clone(),
+            candidates: cfg.candidates,
+        };
 
-/// Enforce tiny-change limits. Return metrics or an error message explaining the violation.
-fn enforce_patch_limits(
-    diff: &str,
-    max_files: usize,
-    max_hunks: usize,
-    max_changed_lines: usize,
-) -> Result<PatchMetrics, String> {
-    let m = patch_metrics(diff);
-    if m.files == 0 {
-        return Err("no files found in diff".into());
-    }
-    if m.files > max_files {
-        return Err(format!("too many files: {} > {}", m.files, max_files));
-    }
-    if m.hunks > max_hunks {
-        return Err(format!("too many hunks: {} > {}", m.hunks, max_hunks));
-    }
-    if m.changed > max_changed_lines {
-        return Err(format!(
-            "too many changed lines: {} > {}",
-            m.changed, max_changed_lines
-        ));
-    }
-    Ok(m)
-}
-
-/// Run test command and return output for analysis
-async fn run_test_command(repo_path: &str, test_cmd: &str) -> Result<(i32, String)> {
-    let mut cmd = Command::new("sh");
-    cmd.arg("-c").arg(test_cmd).current_dir(repo_path);
-
-    let output = cmd.output().await?;
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    let combined = format!("{}\n{}", stdout, stderr);
-
-    let exit_code = output.status.code().unwrap_or(-1);
-    Ok((exit_code, combined))
-}
-
-/// Apply patch with tiny-change enforcement
-fn apply_patch_with_limits(diff: &str) -> Result<bool> {
-    // Tiny-change guard: ≤1 file, ≤2 hunks, ≤20 changed lines.
-    match enforce_patch_limits(diff, 1, 2, 20) {
-        Ok(metrics) => {
-            println!(
-                "[worker] patch accepted (files={}, hunks={}, +{}, -{}, total={})",
-                metrics.files, metrics.hunks, metrics.added, metrics.removed, metrics.changed
-            );
-            Ok(true)
+        if let Some(ref build_output) = input.last_build_output {
+            println!("📋 Including previous build output ({} chars)", build_output.len());
         }
-        Err(reason) => {
-            eprintln!("[worker] rejecting patch: {}", reason);
-            Ok(false)
+
+        println!("🧠 Requesting patch proposals from DeepSeek...");
+        let plan_json = serde_json::to_string_pretty(&input)?;
+        println!("   📤 Sending prompt ({} chars)", plan_json.len());
+        let prompt = format!(
+            r#"
+Return **ONLY** valid JSON of the form:
+{{
+  "patches": PatchSet[]
+}}
+
+Where `PatchSet` matches this JSON Schema:
+{patch_schema}
+
+Your constraints:
+- Prefer tiny, deterministic tests (≤ ~30 lines each) when helpful:
+  * Put new tests under `tests/` as `tests/smoke_*.rs` or inside an existing module as `#[cfg(test)] mod tests {{ ... }}`
+  * No network, filesystem, randomness, time sleeps, threads, or flakiness.
+  * Tests must compile and run in < 2s.
+- Keep code edits conservative and localized (≤ ~200 changed lines per patch set).
+- If last build output shows an error, fix it minimally and add a focused test if it makes sense.
+- NEVER change Cargo features in ways that break builds.
+- Target stable Rust (1.75+).
+
+Input:
+{plan}
+"#,
+            patch_schema = serde_json::to_string_pretty(&schemars::schema_for!(PatchSet))?,
+            plan = plan_json
+        );
+
+        let raw = agent.prompt(prompt).await.context("LLM call failed")?;
+        println!("   📥 Received response ({} chars)", raw.len());
+        
+        println!("🔍 Parsing patch proposals...");
+        let parsed = parse_patches(&raw)?;
+        if parsed.is_empty() {
+            println!("❌ Model returned no patches; stopping.");
+            break;
         }
-    }
-}
-
-/// Generate tiny-change guidance prompt
-fn build_tiny_change_prompt(
-    repo_path: &str,
-    test_cmd: &str,
-    exit_code: i32,
-    test_output: &str,
-) -> String {
-    let trimmed_output = test_output.chars().take(9000).collect::<String>();
-    format!(
-        "Repo path: {}\n\
-         \n\
-         Goal: Fix the failing test(s) with the smallest safe change.\n\
-         \n\
-         Rules:\n\
-         - Make the smallest change that plausibly fixes the immediate issue.\n\
-         - Touch at most 1 file and at most 2 hunks per response.\n\
-         - Change at most 20 lines total (additions + deletions).\n\
-         - No refactors, no formatting-only edits, no renames/moves.\n\
-         - Preserve existing style and public APIs.\n\
-         - If a fix is uncertain, add a guarded check or TODO and keep the change minimal.\n\
-         \n\
-         Output contract:\n\
-         - Return exactly one unified diff inside a single code fence with the language tag `diff`.\n\
-         - No prose before or after the fence. No extra fences.\n\
-         - The diff must apply from repo root and use `diff --git a/... b/...` headers.\n\
-         \n\
-         Signals:\n\
-         - Test command: {}\n\
-         - Exit code: {}\n\
-         - Test output (trimmed):\n{}\n\
-         \n\
-         Return: exactly one unified diff inside one ```diff fence (no extra text). If no compliant fix: NO CHANGE.\n",
-        repo_path, test_cmd, exit_code, trimmed_output
-    )
-}
-
-/// Contract
-/// - Input: none (hardcodes repo URL for demo)
-/// - Behavior: clones nautilus_trader if not exists, then connects to mcp-server-git and demonstrates tiny-change protocol
-/// - Output: prints server info, tools list, git_status, and demonstrates patch enforcement
-#[tokio::main]
-async fn main() -> Result<()> {
-    // Target repo
-    let repo_url = "https://github.com/nautechsystems/nautilus_trader";
-    let repo_dir = std::path::PathBuf::from("./nautilus_trader");
-
-    // Ensure we have a local clone; use `git` directly for the initial fetch
-    if !repo_dir.exists() {
-        println!("Cloning {repo_url} to {:?}...", repo_dir);
-        let status = tokio::process::Command::new("git")
-            .arg("clone")
-            .arg("--depth")
-            .arg("1")
-            .arg(repo_url)
-            .arg(&repo_dir)
-            .status()
-            .await?;
-        if !status.success() {
-            anyhow::bail!("git clone failed with status {status}");
+        
+        println!("   ✅ Found {} patch proposals:", parsed.len());
+        for (i, ps) in parsed.iter().enumerate() {
+            println!("      {} - {} ({} edits)", i + 1, ps.title, ps.edits.len());
+            for edit in &ps.edits {
+                match edit {
+                    Edit::ReplaceFile { path, content } => {
+                        println!("         📝 ReplaceFile: {} ({} bytes)", path, content.len());
+                    }
+                    Edit::SearchReplace { path, search, replace, .. } => {
+                        println!("         🔄 SearchReplace: {} ({}→{})", path, search.chars().take(20).collect::<String>(), replace.chars().take(20).collect::<String>());
+                    }
+                    Edit::InsertBefore { path, anchor, insert } => {
+                        println!("         ⬆️ InsertBefore: {} before {} ({} chars)", path, anchor.chars().take(20).collect::<String>(), insert.len());
+                    }
+                    Edit::InsertAfter { path, anchor, insert } => {
+                        println!("         ⬇️ InsertAfter: {} after {} ({} chars)", path, anchor.chars().take(20).collect::<String>(), insert.len());
+                    }
+                }
+            }
         }
-    }
 
-    // Connect to mcp-server-git via uvx
-    let service = ()
-        .serve(TokioChildProcess::new(Command::new("uvx").configure(
-            |cmd| {
-                cmd.arg("mcp-server-git");
-            },
-        ))?)
-        .await?;
+        println!("🔧 Evaluating candidates in parallel ({} jobs)...", cfg.jobs);
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(cfg.jobs)
+            .build_global()
+            .ok();
 
-    // Server info
-    let server_info = service.peer_info();
-    println!("Connected to server: {server_info:#?}");
-
-    // List tools
-    let tools = service.list_tools(Default::default()).await?;
-    println!("Available tools: {tools:#?}");
-
-    // Call git_status on the cloned repo
-    let repo_path = repo_dir.canonicalize()?.to_string_lossy().to_string();
-    let result = service
-        .call_tool(CallToolRequestParam {
-            name: "git_status".into(),
-            arguments: serde_json::json!({
-                "repo_path": &repo_path,
+        let evals: Vec<_> = parsed
+            .par_iter()
+            .enumerate()
+            .map(|(i, ps)| {
+                println!("   🚀 Starting evaluation of candidate {}", i + 1);
+                (i, try_build_and_test_in_temp(&cfg, ps))
             })
-            .as_object()
-            .cloned(),
-        })
-        .await?;
-    println!("git_status: {result:#?}");
+            .collect();
 
-    // Demonstrate tiny-change protocol
-    println!("\n=== Demonstrating Tiny-Change Protocol ===");
+        println!("📊 Evaluation results:");
+        for (i, result) in &evals {
+            match result {
+                Ok(eval) => {
+                    let check_status = if eval.check_ok { "✅" } else { "❌" };
+                    let test_status = if eval.tests_ok { "✅" } else { "❌" };
+                    println!("   Candidate {}: {} check, {} tests", i + 1, check_status, test_status);
+                    if !eval.build_stderr.is_empty() && (!eval.check_ok || !eval.tests_ok) {
+                        println!("      Error preview: {}", eval.build_stderr.lines().take(3).collect::<Vec<_>>().join(" | "));
+                    }
+                }
+                Err(e) => {
+                    println!("   Candidate {}: ❌ evaluation failed: {}", i + 1, e);
+                }
+            }
+        }
 
-    // Example test command (this would come from user input in real usage)
-    let test_cmd = "python -m pytest tests/unit_tests/test_example.py -v";
+        // Winner = first candidate where check & tests both pass.
+        if let Some((i, Ok(_ce))) = evals.into_iter().find(|(_, r)| {
+            if let Ok(eval) = r {
+                eval.check_ok && eval.tests_ok
+            } else {
+                false
+            }
+        }) {
+            let ps = &parsed[i];
+            println!("✅ Candidate {i} compiles and tests pass: {}", ps.title);
 
-    // Simulate running test and getting failure
-    println!("Simulating test run...");
-    let (exit_code, test_output) = run_test_command(&repo_path, test_cmd).await?;
-    println!("Test exit code: {}", exit_code);
+            // Apply to real repo transactionally and guard again with check + test.
+            apply_patchset_transactional(&cfg.target, ps)
+                .context("Failed to apply patchset transactionally to real repo")?;
 
-    // Generate guidance prompt using tiny-change protocol
-    let guidance = build_tiny_change_prompt(&repo_path, test_cmd, exit_code, &test_output);
-    println!("\nGenerated guidance prompt:\n{}", guidance);
+            // Commit only if the post-apply gates are green.
+            ensure_git_repo(&cfg.target)?;
+            git_add_all(&cfg.target)?;
+            git_commit(
+                &cfg.target,
+                &format!("{} [autopatch]\n\n{}", ps.title.trim(), ps.rationale.trim()),
+            )?;
+            println!("🎉 Committed (build + tests green).");
 
-    // Demonstrate patch enforcement with examples
-    println!("\n=== Demonstrating Patch Enforcement ===");
-
-    // Example 1: Valid tiny patch
-    let valid_patch = r#"diff --git a/example.py b/example.py
-index 1234567..abcdefg 100644
---- a/example.py
-+++ b/example.py
-@@ -10,7 +10,7 @@ def calculate():
-     x = 5
-     y = 10
--    return x + y
-+    return x * y
-     
- def main():
-     result = calculate()
-"#;
-
-    println!("Testing valid tiny patch:");
-    match apply_patch_with_limits(valid_patch) {
-        Ok(true) => println!("✓ Patch would be accepted"),
-        Ok(false) => println!("✗ Patch was rejected"),
-        Err(e) => println!("Error: {}", e),
+            last_build_output = None;
+        } else {
+            println!("No candidate passed both build and tests.");
+            // Capture a failing build log to feed back next time (best-effort on first candidate).
+            let _last_build_output = Some(
+                parsed
+                    .get(0)
+                    .and_then(|p| try_build_and_test_in_temp(&cfg, p).ok())
+                    .map(|ce| ce.build_stderr)
+                    .unwrap_or_default(),
+            );
+            break;
+        }
     }
-
-    // Example 2: Invalid large patch
-    let large_patch = r#"diff --git a/file1.py b/file1.py
-index 1234567..abcdefg 100644
---- a/file1.py
-+++ b/file1.py
-@@ -1,10 +1,15 @@
-+# New header comment
-+# Another comment
-+# Yet another comment
- def function1():
--    pass
-+    # Refactored implementation
-+    x = calculate_something()
-+    y = calculate_something_else()
-+    z = combine_results(x, y)
-+    return process_final(z)
-
-diff --git a/file2.py b/file2.py  
-index 2345678..bcdefgh 100644
---- a/file2.py
-+++ b/file2.py
-@@ -5,8 +5,12 @@ class Example:
-     def __init__(self):
--        self.value = 0
-+        # New initialization
-+        self.value = initialize_value()
-+        self.state = setup_state()
-+        self.config = load_config()
-"#;
-
-    println!("\nTesting oversized patch (should be rejected):");
-    match apply_patch_with_limits(large_patch) {
-        Ok(true) => println!("✓ Patch would be accepted"),
-        Ok(false) => println!("✗ Patch was rejected (as expected)"),
-        Err(e) => println!("Error: {}", e),
-    }
-
-    // Close
-    service.cancel().await?;
 
     Ok(())
+}
+
+/// Strong system guidance for tiny, safe edits + tiny deterministic tests.
+const SYSTEM_PROMPT: &str = r#"
+You are a careful Rust engineer who makes micro-edits and adds tiny, deterministic tests.
+Rules:
+- Keep edits small, localized, and compilation-safe.
+- Prefer doc improvements, minor refactors, explicit imports/derives, and lint fixes.
+- Tests must be deterministic (no I/O, no sleeps, no randomness, no time).
+- When fixing a concrete error from the last build, add a focused test if it helps prevent regressions.
+"#;
+
+/// Policy the model receives inside the input blob.
+const POLICY_TEXT: &str = r#"
+Output strictly valid JSON for { "patches": PatchSet[] }.
+Use only the provided edit kinds. Avoid broad matches in search/replace.
+Prefer adding tests under `tests/` as `smoke_*` or minimal `#[cfg(test)]` modules.
+"#;
+
+/// Candidate result from temp evaluation.
+#[derive(Default)]
+struct CandidateEval {
+    check_ok: bool,
+    tests_ok: bool,
+    build_stderr: String,
+}
+
+/// Evaluate a candidate in a fresh temp copy of the project:
+/// 1) apply edits (atomic writes),
+/// 2) cargo check,
+/// 3) cargo test.
+fn try_build_and_test_in_temp(cfg: &Config, ps: &PatchSet) -> Result<CandidateEval> {
+    let tmp = TempDir::new()?;
+    let td = tmp.path().to_path_buf();
+
+    let mut cp = CopyOptions::new();
+    cp.copy_inside = true;
+    cp.overwrite = true;
+    copy_dir(&cfg.target, &td, &cp).with_context(|| "Failed to copy target into temp dir")?;
+
+    // Atomic writes even in temp (keeps semantics identical).
+    apply_patchset_atomic_only(&td, ps)?;
+
+    let check_out = run_cargo_capture(&td, &["check"])?;
+    let check_ok = check_out.status.success();
+    let mut build_stderr = String::from_utf8_lossy(&check_out.stderr).to_string();
+
+    let tests_ok = if check_ok {
+        let test_out = run_cargo_capture(&td, &["test"])?;
+        if !test_out.status.success() {
+            build_stderr.push_str(&String::from_utf8_lossy(&test_out.stderr));
+        }
+        test_out.status.success()
+    } else {
+        false
+    };
+
+    Ok(CandidateEval {
+        check_ok,
+        tests_ok,
+        build_stderr,
+    })
+}
+
+/// Transactionally apply a patch set to the real repo:
+/// - Pre-validate all edits (anchors/search exist) & compute new contents in-memory.
+/// - Create a single backup directory for all touched files.
+/// - Write each file via atomic tempfile+persist (same dir) and fsync best-effort.
+/// - If ANY write fails, roll back from backups.
+/// - Run `cargo check` and `cargo test`; if either fails, roll back entirely.
+/// - On success, delete the backup directory.
+fn apply_patchset_transactional(root: &Path, ps: &PatchSet) -> Result<()> {
+    let plan = plan_edits(root, ps)
+        .with_context(|| format!("Pre-validation failed for patch '{}'", ps.title))?;
+
+    let backup_dir = make_backup_dir(root)?;
+    // Create backups up-front so we can roll back on any error.
+    for f in &plan.files_to_write {
+        if f.existed_before {
+            let src = root.join(&f.rel_path);
+            let dst = backup_dir.join(&f.rel_path);
+            if let Some(dir) = dst.parent() {
+                fs::create_dir_all(dir)?;
+            }
+            fs::copy(&src, &dst).with_context(|| format!("Failed to backup {}", f.rel_path))?;
+        }
+    }
+
+    // Attempt writes atomically per file.
+    if let Err(e) = write_all_atomically(root, &plan) {
+        eprintln!("❌ Write failure: {e}. Rolling back…");
+        rollback_from_backups(root, &backup_dir, &plan)?;
+        return Err(e);
+    }
+
+    // Gate: check + test.
+    if let Err(e) = run_cargo(root, &["check"]) {
+        eprintln!("❌ `cargo check` failed after apply: {e}. Rolling back…");
+        rollback_from_backups(root, &backup_dir, &plan)?;
+        return Err(anyhow!("post-apply cargo check failed"));
+    }
+    if let Err(e) = run_cargo(root, &["test"]) {
+        eprintln!("❌ `cargo test` failed after apply: {e}. Rolling back…");
+        rollback_from_backups(root, &backup_dir, &plan)?;
+        return Err(anyhow!("post-apply cargo test failed"));
+    }
+
+    // Success: cleanup backups.
+    let _ = fs::remove_dir_all(&backup_dir);
+    Ok(())
+}
+
+/// Apply patchset using only atomic writes (no backups/rollback). Used in temp dirs.
+fn apply_patchset_atomic_only(root: &Path, ps: &PatchSet) -> Result<()> {
+    let plan = plan_edits(root, ps)?;
+    write_all_atomically(root, &plan)
+}
+
+/// Pre-validated, computed outputs for a patch.
+struct PlannedEdits {
+    files_to_write: Vec<FileWritePlan>,
+}
+
+/// One file that will be rewritten atomically.
+struct FileWritePlan {
+    rel_path: String,
+    new_content: String,
+    existed_before: bool,
+}
+
+/// Build a deterministic plan: validate anchors/search and compute final contents in-memory.
+/// No files are touched in this phase.
+fn plan_edits(root: &Path, ps: &PatchSet) -> Result<PlannedEdits> {
+    // Map of rel_path -> current content (lazy-read).
+    let mut cache: BTreeMap<String, Option<String>> = BTreeMap::new();
+    let mut writes: Vec<FileWritePlan> = Vec::new();
+
+    for edit in &ps.edits {
+        match edit {
+            Edit::ReplaceFile { path, content } => {
+                let rel = path.clone();
+                let existed = root.join(&rel).exists();
+                writes.push(FileWritePlan {
+                    rel_path: rel,
+                    new_content: content.clone(),
+                    existed_before: existed,
+                });
+            }
+            Edit::SearchReplace {
+                path,
+                search,
+                replace,
+                occurrences,
+            } => {
+                let rel = path.clone();
+                let old = read_cached(root, &mut cache, &rel)?;
+                let occ = occurrences.unwrap_or(1).max(1);
+                if !old.contains(search) {
+                    return Err(anyhow!("Search string not found in {}", rel));
+                }
+                let new = old.replacen(search, replace, occ);
+                writes.push(FileWritePlan {
+                    rel_path: rel,
+                    new_content: new,
+                    existed_before: true,
+                });
+            }
+            Edit::InsertBefore {
+                path,
+                anchor,
+                insert,
+            } => {
+                let rel = path.clone();
+                let mut old = read_cached(root, &mut cache, &rel)?;
+                if let Some(pos) = old.find(anchor) {
+                    old.insert_str(pos, insert);
+                    writes.push(FileWritePlan {
+                        rel_path: rel,
+                        new_content: old,
+                        existed_before: true,
+                    });
+                } else {
+                    return Err(anyhow!("Anchor not found in {}", path));
+                }
+            }
+            Edit::InsertAfter {
+                path,
+                anchor,
+                insert,
+            } => {
+                let rel = path.clone();
+                let mut old = read_cached(root, &mut cache, &rel)?;
+                if let Some(pos) = old.find(anchor) {
+                    let new_pos = pos + anchor.len();
+                    old.insert_str(new_pos, insert);
+                    writes.push(FileWritePlan {
+                        rel_path: rel,
+                        new_content: old,
+                        existed_before: true,
+                    });
+                } else {
+                    return Err(anyhow!("Anchor not found in {}", path));
+                }
+            }
+        }
+    }
+
+    Ok(PlannedEdits {
+        files_to_write: writes,
+    })
+}
+
+fn read_cached(
+    root: &Path,
+    cache: &mut BTreeMap<String, Option<String>>,
+    rel: &str,
+) -> Result<String> {
+    if !cache.contains_key(rel) {
+        let p = root.join(rel);
+        cache.insert(
+            rel.to_string(),
+            Some(fs::read_to_string(&p).with_context(|| format!("Cannot read file: {}", rel))?),
+        );
+    }
+    Ok(cache.get(rel).and_then(|o| o.clone()).unwrap())
+}
+
+/// Write all planned files atomically. If any write fails, caller must roll back using backups.
+fn write_all_atomically(root: &Path, plan: &PlannedEdits) -> Result<()> {
+    for f in &plan.files_to_write {
+        let dst = root.join(&f.rel_path);
+        atomic_write(&dst, &f.new_content)
+            .with_context(|| format!("Atomic write failed for {}", f.rel_path))?;
+    }
+    Ok(())
+}
+
+/// Perform atomic write to `path`:
+/// - create parent dir,
+/// - write to a tempfile in the same directory,
+/// - flush file, persist (atomic rename),
+/// - best-effort fsync of the directory.
+fn atomic_write(path: &Path, content: &str) -> Result<()> {
+    if let Some(dir) = path.parent() {
+        fs::create_dir_all(dir)?;
+        let mut tmp = tempfile::Builder::new()
+            .prefix(".autopatch.")
+            .tempfile_in(dir)?;
+        tmp.as_file_mut().write_all(content.as_bytes())?;
+        tmp.as_file_mut().sync_all()?; // flush file
+
+        // Persist atomically over the destination.
+        tmp.persist(path)
+            .map_err(|e| anyhow!("persist failed for {}: {}", path.display(), e))?;
+
+        // Best-effort: sync directory metadata.
+        if let Ok(df) = fs::File::open(dir) {
+            let _ = df.sync_all();
+        }
+        Ok(())
+    } else {
+        Err(anyhow!("No parent directory for {}", path.display()))
+    }
+}
+
+/// Create a unique backup directory under `<root>/.autopatch_backups/<ts>-<pid>/`
+fn make_backup_dir(root: &Path) -> Result<PathBuf> {
+    let ts = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    let pid = std::process::id();
+    let dir = root
+        .join(".autopatch_backups")
+        .join(format!("{}-{}", ts, pid));
+    fs::create_dir_all(&dir)?;
+    Ok(dir)
+}
+
+/// Roll back all touched files from backups. Removes newly created files (that had no backup).
+fn rollback_from_backups(root: &Path, backup_dir: &Path, plan: &PlannedEdits) -> Result<()> {
+    for f in &plan.files_to_write {
+        let dst = root.join(&f.rel_path);
+        let bak = backup_dir.join(&f.rel_path);
+        if bak.exists() {
+            // Restore via atomic write from backup content.
+            let mut buf = String::new();
+            fs::File::open(&bak)?.read_to_string(&mut buf)?;
+            atomic_write(&dst, &buf)?;
+        } else {
+            // File did not exist before; remove it if present.
+            let _ = fs::remove_file(&dst);
+        }
+    }
+    Ok(())
+}
+
+/// Snapshot a bounded view of the codebase for the model context.
+fn snapshot_codebase(
+    root: &Path,
+    max_files: usize,
+    max_bytes: usize,
+) -> Result<BTreeMap<String, String>> {
+    let mut files: Vec<PathBuf> = vec![];
+    for entry in WalkDir::new(root)
+        .into_iter()
+        .filter_entry(|e| include_in_snapshot(e.path()))
+        .filter_map(|e| e.ok())
+    {
+        let p = entry.path();
+        if p.is_file() && is_rust_source(p) {
+            files.push(p.to_path_buf());
+        }
+    }
+
+    files.sort();
+    files.truncate(max_files);
+
+    let mut map = BTreeMap::new();
+    for p in files {
+        let rel = path_relative(root, &p);
+        let mut content = fs::read_to_string(&p).unwrap_or_default();
+        if content.len() > max_bytes {
+            content.truncate(max_bytes);
+            content.push_str("\n/* … truncated … */\n");
+        }
+        map.insert(rel, content);
+    }
+    Ok(map)
+}
+
+fn include_in_snapshot(path: &Path) -> bool {
+    let bad = [
+        "target",
+        ".git",
+        ".hg",
+        ".svn",
+        ".idea",
+        ".vscode",
+        ".autopatch_backups",
+    ];
+    if path.components().any(|c| {
+        let s = c.as_os_str().to_string_lossy();
+        bad.iter().any(|b| s == *b)
+    }) {
+        return false;
+    }
+    true
+}
+
+fn is_rust_source(path: &Path) -> bool {
+    path.extension() == Some(OsStr::new("rs")) || path.file_name() == Some(OsStr::new("Cargo.toml"))
+}
+
+fn path_relative(root: &Path, p: &Path) -> String {
+    pathdiff::diff_paths(p, root)
+        .unwrap_or_else(|| p.to_path_buf())
+        .to_string_lossy()
+        .into_owned()
+}
+
+fn run_cargo(root: &Path, args: &[&str]) -> Result<()> {
+    let st = Command::new("cargo")
+        .args(args)
+        .current_dir(root)
+        .status()?;
+    if !st.success() {
+        return Err(anyhow!("cargo {:?} failed", args));
+    }
+    Ok(())
+}
+
+fn run_cargo_capture(root: &Path, args: &[&str]) -> Result<std::process::Output> {
+    Ok(Command::new("cargo")
+        .args(args)
+        .current_dir(root)
+        .stderr(Stdio::piped())
+        .stdout(Stdio::piped())
+        .output()?)
+}
+
+fn ensure_git_repo(root: &Path) -> Result<()> {
+    let inside = Command::new("git")
+        .args(["rev-parse", "--is-inside-work-tree"])
+        .current_dir(root)
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false);
+
+    if inside {
+        return Ok(());
+    }
+
+    Command::new("git").arg("init").current_dir(root).status()?;
+    git_add_all(root)?;
+    git_commit(root, "chore: initial commit [autopatch]")?;
+    Ok(())
+}
+
+fn git_add_all(root: &Path) -> Result<()> {
+    let ok = Command::new("git")
+        .args(["add", "-A"])
+        .current_dir(root)
+        .status()?
+        .success();
+    if !ok {
+        return Err(anyhow!("git add -A failed"));
+    }
+    Ok(())
+}
+
+fn git_commit(root: &Path, msg: &str) -> Result<()> {
+    let ok = Command::new("git")
+        .args(["commit", "-m", msg])
+        .current_dir(root)
+        .status()?
+        .success();
+    if !ok {
+        return Err(anyhow!("git commit failed"));
+    }
+    Ok(())
+}
+
+fn ensure_command_exists(name: &str) -> Result<()> {
+    which::which(name)
+        .map(|_| ())
+        .with_context(|| format!("Command `{name}` not found in PATH"))
+}
+
+/// Parse the JSON response from the LLM to extract patch sets.
+fn parse_patches(raw: &str) -> Result<Vec<PatchSet>> {
+    // Find JSON in the response (model might include explanations)
+    let start_idx = raw.find('{').unwrap_or(0);
+    let end_idx = raw.rfind('}').map(|i| i + 1).unwrap_or(raw.len());
+    let json_part = &raw[start_idx..end_idx];
+
+    #[derive(Deserialize)]
+    struct Response {
+        patches: Vec<PatchSet>,
+    }
+
+    let response: Response =
+        serde_json::from_str(json_part).context("Failed to parse LLM response as JSON")?;
+
+    Ok(response.patches)
+}
+
+// Minimal pathdiff impl (to avoid an extra dependency).
+mod pathdiff {
+    use std::path::{Component, Path, PathBuf};
+
+    pub fn diff_paths(path: &Path, base: &Path) -> Option<PathBuf> {
+        let mut ita = base.components();
+        let mut itb = path.components();
+
+        let mut comps_a = vec![];
+        let mut comps_b = vec![];
+
+        loop {
+            match (ita.next(), itb.next()) {
+                (Some(a), Some(b)) if comp_eq(a, b) => continue,
+                (a, b) => {
+                    if let Some(c) = a {
+                        comps_a.push(c);
+                        for c in ita {
+                            comps_a.push(c);
+                        }
+                    }
+                    if let Some(c) = b {
+                        comps_b.push(c);
+                        for c in itb {
+                            comps_b.push(c);
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+
+        let mut out = PathBuf::new();
+        for _ in comps_a.iter().filter(|c| !is_cur_dir(c)) {
+            out.push("..");
+        }
+        for c in comps_b {
+            out.push(c.as_os_str());
+        }
+        Some(out)
+    }
+
+    fn comp_eq(a: Component, b: Component) -> bool {
+        a.as_os_str() == b.as_os_str()
+    }
+    fn is_cur_dir(c: &Component) -> bool {
+        matches!(c, Component::CurDir)
+    }
 }
