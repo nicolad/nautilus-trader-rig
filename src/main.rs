@@ -94,7 +94,7 @@ struct Config {
 fn main() -> Result<()> {
     // Load environment variables from .env file
     dotenv().ok();
-    
+
     // Initialize logging with detailed output
     env_logger::Builder::from_default_env()
         .filter_level(log::LevelFilter::Info)
@@ -120,16 +120,17 @@ fn main() -> Result<()> {
     println!("   Parallel jobs: {}", cfg.jobs);
     println!("   Max files in snapshot: {}", cfg.snapshot_max_files);
     println!("   Max bytes per file: {}", cfg.snapshot_max_bytes);
-    println!();    let rt = tokio::runtime::Runtime::new()?;
+    println!();
+    let rt = tokio::runtime::Runtime::new()?;
     rt.block_on(run(cfg))
 }
 
 async fn run(cfg: Config) -> Result<()> {
     println!("🔍 Checking prerequisites...");
-    
+
     ensure_command_exists("git").context("`git` is required in PATH")?;
     println!("   ✅ git found");
-    
+
     ensure_command_exists("cargo").context("`cargo` is required (install Rust toolchain)")?;
     println!("   ✅ cargo found");
 
@@ -149,7 +150,7 @@ async fn run(cfg: Config) -> Result<()> {
         for (path, content) in &files {
             println!("      {} ({} bytes)", path, content.len());
         }
-        
+
         let input = PlanningInput {
             policy: POLICY_TEXT.to_string(),
             files,
@@ -158,7 +159,10 @@ async fn run(cfg: Config) -> Result<()> {
         };
 
         if let Some(ref build_output) = input.last_build_output {
-            println!("📋 Including previous build output ({} chars)", build_output.len());
+            println!(
+                "📋 Including previous build output ({} chars)",
+                build_output.len()
+            );
         }
 
         println!("🧠 Requesting patch proposals from DeepSeek...");
@@ -193,36 +197,71 @@ Input:
 
         let raw = agent.prompt(prompt).await.context("LLM call failed")?;
         println!("   📥 Received response ({} chars)", raw.len());
-        
+
         println!("🔍 Parsing patch proposals...");
         let parsed = parse_patches(&raw)?;
         if parsed.is_empty() {
             println!("❌ Model returned no patches; stopping.");
             break;
         }
-        
+
         println!("   ✅ Found {} patch proposals:", parsed.len());
         for (i, ps) in parsed.iter().enumerate() {
             println!("      {} - {} ({} edits)", i + 1, ps.title, ps.edits.len());
             for edit in &ps.edits {
                 match edit {
                     Edit::ReplaceFile { path, content } => {
-                        println!("         📝 ReplaceFile: {} ({} bytes)", path, content.len());
+                        println!(
+                            "         📝 ReplaceFile: {} ({} bytes)",
+                            path,
+                            content.len()
+                        );
                     }
-                    Edit::SearchReplace { path, search, replace, .. } => {
-                        println!("         🔄 SearchReplace: {} ({}→{})", path, search.chars().take(20).collect::<String>(), replace.chars().take(20).collect::<String>());
+                    Edit::SearchReplace {
+                        path,
+                        search,
+                        replace,
+                        ..
+                    } => {
+                        println!(
+                            "         🔄 SearchReplace: {} ({}→{})",
+                            path,
+                            search.chars().take(20).collect::<String>(),
+                            replace.chars().take(20).collect::<String>()
+                        );
                     }
-                    Edit::InsertBefore { path, anchor, insert } => {
-                        println!("         ⬆️ InsertBefore: {} before {} ({} chars)", path, anchor.chars().take(20).collect::<String>(), insert.len());
+                    Edit::InsertBefore {
+                        path,
+                        anchor,
+                        insert,
+                    } => {
+                        println!(
+                            "         ⬆️ InsertBefore: {} before {} ({} chars)",
+                            path,
+                            anchor.chars().take(20).collect::<String>(),
+                            insert.len()
+                        );
                     }
-                    Edit::InsertAfter { path, anchor, insert } => {
-                        println!("         ⬇️ InsertAfter: {} after {} ({} chars)", path, anchor.chars().take(20).collect::<String>(), insert.len());
+                    Edit::InsertAfter {
+                        path,
+                        anchor,
+                        insert,
+                    } => {
+                        println!(
+                            "         ⬇️ InsertAfter: {} after {} ({} chars)",
+                            path,
+                            anchor.chars().take(20).collect::<String>(),
+                            insert.len()
+                        );
                     }
                 }
             }
         }
 
-        println!("🔧 Evaluating candidates in parallel ({} jobs)...", cfg.jobs);
+        println!(
+            "🔧 Evaluating candidates in parallel ({} jobs)...",
+            cfg.jobs
+        );
         rayon::ThreadPoolBuilder::new()
             .num_threads(cfg.jobs)
             .build_global()
@@ -243,9 +282,21 @@ Input:
                 Ok(eval) => {
                     let check_status = if eval.check_ok { "✅" } else { "❌" };
                     let test_status = if eval.tests_ok { "✅" } else { "❌" };
-                    println!("   Candidate {}: {} check, {} tests", i + 1, check_status, test_status);
+                    println!(
+                        "   Candidate {}: {} check, {} tests",
+                        i + 1,
+                        check_status,
+                        test_status
+                    );
                     if !eval.build_stderr.is_empty() && (!eval.check_ok || !eval.tests_ok) {
-                        println!("      Error preview: {}", eval.build_stderr.lines().take(3).collect::<Vec<_>>().join(" | "));
+                        println!(
+                            "      Error preview: {}",
+                            eval.build_stderr
+                                .lines()
+                                .take(3)
+                                .collect::<Vec<_>>()
+                                .join(" | ")
+                        );
                     }
                 }
                 Err(e) => {
@@ -283,7 +334,7 @@ Input:
         } else {
             println!("💔 No candidate passed both build and tests.");
             println!("📝 Capturing build output for next iteration...");
-            
+
             // Capture a failing build log to feed back next time (best-effort on first candidate).
             last_build_output = Some(
                 parsed
@@ -292,7 +343,7 @@ Input:
                     .map(|ce| ce.build_stderr)
                     .unwrap_or_default(),
             );
-            
+
             if let Some(ref output) = last_build_output {
                 println!("   📋 Captured {} chars of build output", output.len());
             }
@@ -355,7 +406,10 @@ fn try_build_and_test_in_temp(cfg: &Config, ps: &PatchSet) -> Result<CandidateEv
     let check_out = run_cargo_capture(&td, &["check"])?;
     let check_ok = check_out.status.success();
     let mut build_stderr = String::from_utf8_lossy(&check_out.stderr).to_string();
-    println!("         {} cargo check", if check_ok { "✅" } else { "❌" });
+    println!(
+        "         {} cargo check",
+        if check_ok { "✅" } else { "❌" }
+    );
 
     let tests_ok = if check_ok {
         println!("      🧪 Running cargo test...");
