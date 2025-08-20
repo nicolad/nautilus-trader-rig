@@ -128,7 +128,7 @@ mod tests {
 
     #[test]
     fn test_config_from_env() {
-        let config = Config::from_env();
+        let config = AutopatcherConfig::from_env();
         assert!(config.validate().is_ok(), "Config from env should be valid");
     }
 }
