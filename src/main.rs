@@ -721,10 +721,10 @@ fn try_build_and_test_shuttle(cfg: &AutopatcherConfig, ps: &PatchSet) -> Result<
     // In Shuttle, skip cargo validation to avoid issues
     println!("      🏭 Shuttle environment - skipping cargo validation");
     println!("         ⚠️  Cargo checks disabled in production environment");
-    
+
     Ok(CandidateEval {
         check_ok: true, // Assume success in Shuttle
-        tests_ok: true, // Assume success in Shuttle  
+        tests_ok: true, // Assume success in Shuttle
         build_stderr: String::new(),
     })
 }
@@ -736,17 +736,19 @@ fn copy_dir_all(src: &Path, dst: &Path) -> Result<()> {
         let entry = entry?;
         let path = entry.path();
         let file_name = entry.file_name();
-        
+
         // Skip certain directories and files
         if let Some(name) = file_name.to_str() {
-            if name.starts_with('.') && (name == ".git" || name == ".autopatch_worktrees" || name == ".autopatch_temp") {
+            if name.starts_with('.')
+                && (name == ".git" || name == ".autopatch_worktrees" || name == ".autopatch_temp")
+            {
                 continue;
             }
             if name == "target" {
                 continue;
             }
         }
-        
+
         let dst_path = dst.join(file_name);
         if path.is_dir() {
             copy_dir_all(&path, &dst_path)?;
