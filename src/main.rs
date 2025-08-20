@@ -706,6 +706,11 @@ fn try_build_and_test_in_temp(cfg: &AutopatcherConfig, ps: &PatchSet) -> Result<
         || std::env::var("SHUTTLE_PROJECT_ID").is_ok()
         || std::env::var("SHUTTLE_SERVICE_NAME").is_ok();
 
+    if is_shuttle {
+        println!("      🏭 Running in Shuttle environment - using directory copy instead of git worktree");
+        return try_build_and_test_shuttle(cfg, ps);
+    }
+
     println!("      🌿 Creating temporary git worktree at HEAD...");
     let worktrees_root = cfg.target.join(".autopatch_worktrees");
     fs::create_dir_all(&worktrees_root)?;

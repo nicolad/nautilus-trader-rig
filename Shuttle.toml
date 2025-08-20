@@ -8,5 +8,7 @@ assets = [
   "src/*",               # Include source files for analysis
   "Cargo.toml",          # Include cargo manifest
   "*.md",                # Include all markdown files
+  ".git/*",              # Include git repository
+  ".gitignore",          # Include git ignore file
 ]
 
