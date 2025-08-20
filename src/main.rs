@@ -130,11 +130,26 @@ async fn run_autopatcher_job() {
 
     // Load environment variables
     dotenv().ok();
+    println!("📋 Environment variables loaded");
 
     match run_autopatcher().await {
-        Ok(_) => println!("✅ Autopatcher job completed successfully"),
-        Err(e) => eprintln!("❌ Autopatcher job failed: {}", e),
+        Ok(_) => {
+            println!("✅ Autopatcher job completed successfully at: {:?}", Utc::now());
+        }
+        Err(e) => {
+            eprintln!("❌ Autopatcher job failed at: {:?}", Utc::now());
+            eprintln!("❌ Error details: {}", e);
+            eprintln!("❌ Error chain:");
+            let mut source = e.source();
+            let mut depth = 1;
+            while let Some(err) = source {
+                eprintln!("❌   {}: {}", depth, err);
+                source = err.source();
+                depth += 1;
+            }
+        }
     }
+    println!("🔄 Autopatcher job cycle completed at: {:?}", Utc::now());
 }
 
 #[shuttle_runtime::main]
@@ -176,31 +191,59 @@ impl shuttle_runtime::Service for MyService {
 
         // Then run on schedule
         loop {
+            println!("⏱️  Waiting for next interval...");
             interval.tick().await;
             println!("⏰ Timer triggered - running autopatcher job...");
-            run_autopatcher_job().await;
+            
+            // Run with timeout to prevent hanging
+            let timeout_duration = Duration::from_secs(30 * 60); // 30 minutes timeout
+            match tokio::time::timeout(timeout_duration, run_autopatcher_job()).await {
+                Ok(_) => println!("🔄 Job completed within timeout"),
+                Err(_) => {
+                    eprintln!("⚠️  Job timed out after {} seconds", timeout_duration.as_secs());
+                    eprintln!("⚠️  Continuing to next cycle...");
+                }
+            }
         }
     }
 }
 
 async fn run_autopatcher() -> Result<()> {
+    println!("📋 Starting run_autopatcher function...");
+    
     // Load environment variables from .env file
     dotenv().ok();
+    println!("📋 Environment variables loaded with dotenv");
 
-    // Initialize logging with detailed output
-    env_logger::Builder::from_default_env()
+    // Initialize logging with detailed output (only if not already initialized)
+    if std::env::var("RUST_LOG").is_err() {
+        std::env::set_var("RUST_LOG", "info");
+        println!("📋 Set RUST_LOG to info level");
+    }
+    
+    // Try to initialize logger, but ignore if it's already initialized (e.g., by Shuttle)
+    let logger_result = env_logger::Builder::from_default_env()
         .filter_level(log::LevelFilter::Info)
         .format_timestamp_secs()
-        .init();
+        .try_init();
+    
+    match logger_result {
+        Ok(_) => println!("📋 Logger initialized successfully"),
+        Err(_) => println!("📋 Logger already initialized (probably by Shuttle runtime)"),
+    }
 
     // Load configuration
+    println!("📋 Loading configuration...");
     let config = Config::from_env();
+    println!("📋 Configuration loaded successfully");
 
     // Validate configuration
+    println!("📋 Validating configuration...");
     if let Err(e) = config.validate() {
-        eprintln!("Configuration error: {}", e);
+        eprintln!("❌ Configuration error: {}", e);
         return Err(anyhow!("Configuration error: {}", e));
     }
+    println!("✅ Configuration validation passed");
 
     println!("🚀 Starting Rust Autopatcher with DeepSeek");
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
@@ -236,25 +279,58 @@ async fn run_autopatcher() -> Result<()> {
     println!("   🚫 Excluded files: {:?}", config.git.excluded_files);
     println!();
 
-    run(&config).await
+    println!("📋 About to call run() function...");
+    let result = run(&config).await;
+    println!("📋 run() function completed with result: {:?}", result.is_ok());
+    result
 }
 
 async fn run(config: &Config) -> Result<()> {
+    println!("📋 Entered run() function");
     let cfg = &config.autopatcher;
 
     println!("🔍 Checking prerequisites...");
 
+    println!("📋 Checking git command...");
     ensure_command_exists("git").context("`git` is required in PATH")?;
     println!("   ✅ git found");
 
+    println!("📋 Checking cargo command...");
     ensure_command_exists("cargo").context("`cargo` is required (install Rust toolchain)")?;
     println!("   ✅ cargo found");
 
     println!("🔧 Configuring parallelism ({} jobs)...", cfg.jobs);
     init_global_rayon(cfg.jobs);
+    println!("   ✅ Rayon configured");
 
     println!("🤖 Initializing DeepSeek client...");
-    let client = DeepSeekClient::from_env()?;
+    println!("📋 Checking for DEEPSEEK_API_KEY environment variable...");
+    
+    // List all environment variables for debugging
+    println!("📋 Available environment variables:");
+    for (key, value) in std::env::vars() {
+        if key.contains("API") || key.contains("TOKEN") || key.contains("KEY") {
+            println!("   {}: {}", key, if value.len() > 10 { format!("{}...", &value[..10]) } else { "***".to_string() });
+        }
+    }
+    
+    if std::env::var("DEEPSEEK_API_KEY").is_err() {
+        eprintln!("❌ DEEPSEEK_API_KEY environment variable not found");
+        eprintln!("📋 Attempting to load from Secrets.toml through dotenv...");
+        
+        // Try to load from .env file or current directory
+        let _ = dotenvy::from_filename("Secrets.toml");
+        
+        if std::env::var("DEEPSEEK_API_KEY").is_err() {
+            return Err(anyhow!("DEEPSEEK_API_KEY environment variable not set and not found in Secrets.toml"));
+        } else {
+            println!("   ✅ DEEPSEEK_API_KEY loaded from Secrets.toml");
+        }
+    } else {
+        println!("   ✅ DEEPSEEK_API_KEY found in environment");
+    }
+    
+    let client = DeepSeekClient::from_env().context("Failed to create DeepSeek client")?;
     println!("   ✅ DeepSeek client ready");
 
     let mut last_build_output: Option<String> = None;
