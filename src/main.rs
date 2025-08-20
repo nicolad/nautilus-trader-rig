@@ -372,9 +372,22 @@ async fn run(config: &Config) -> Result<()> {
     println!("   ✅ git found");
 
     // Check if we're running in Shuttle environment
+    println!("📋 Debugging Shuttle environment detection...");
+    println!("   SHUTTLE env var: {:?}", std::env::var("SHUTTLE"));
+    println!(
+        "   SHUTTLE_PROJECT_ID env var: {:?}",
+        std::env::var("SHUTTLE_PROJECT_ID")
+    );
+    println!(
+        "   SHUTTLE_SERVICE_NAME env var: {:?}",
+        std::env::var("SHUTTLE_SERVICE_NAME")
+    );
+
     let is_shuttle = std::env::var("SHUTTLE").is_ok()
         || std::env::var("SHUTTLE_PROJECT_ID").is_ok()
         || std::env::var("SHUTTLE_SERVICE_NAME").is_ok();
+
+    println!("   Is Shuttle environment: {}", is_shuttle);
 
     if is_shuttle {
         println!("📋 Running in Shuttle environment - skipping cargo validation");

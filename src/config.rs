@@ -181,8 +181,8 @@ impl Default for GitConfig {
     fn default() -> Self {
         Self {
             github_token: None,
-            user_name: "nautilus-autopatcher".to_string(),
-            user_email: "autopatcher@nautilus.ai".to_string(),
+            user_name: "nicolad".to_string(),
+            user_email: "nicolai.vadim@gmail.com".to_string(),
             excluded_files: vec![
                 ".gitignore".to_string(),
                 "Secrets.toml".to_string(),
@@ -201,10 +201,9 @@ impl GitConfig {
     pub fn from_env() -> Self {
         Self {
             github_token: std::env::var("GITHUB_TOKEN").ok(),
-            user_name: std::env::var("GIT_USER_NAME")
-                .unwrap_or_else(|_| "nautilus-autopatcher".to_string()),
+            user_name: std::env::var("GIT_USER_NAME").unwrap_or_else(|_| "nicolad".to_string()),
             user_email: std::env::var("GIT_USER_EMAIL")
-                .unwrap_or_else(|_| "autopatcher@nautilus.ai".to_string()),
+                .unwrap_or_else(|_| "nicolai.vadim@gmail.com".to_string()),
             excluded_files: vec![
                 ".gitignore".to_string(),
                 "Secrets.toml".to_string(),
