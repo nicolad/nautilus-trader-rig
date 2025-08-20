@@ -82,7 +82,7 @@ mod tests {
 
     #[test]
     fn test_default_config_validation() {
-        let config = Config::default();
+        let config = AutopatcherConfig::default();
         assert!(config.validate().is_ok(), "Default config should be valid");
     }
 
