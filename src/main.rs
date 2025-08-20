@@ -156,7 +156,58 @@ async fn run_autopatcher_job() {
 }
 
 #[shuttle_runtime::main]
-async fn main() -> Result<MyService, shuttle_runtime::Error> {
+async fn main(
+    #[shuttle_runtime::Secrets] secrets: shuttle_runtime::SecretStore,
+) -> Result<MyService, shuttle_runtime::Error> {
+    // Load all secrets from Shuttle and set them as environment variables
+    println!("🔑 Loading secrets from Shuttle SecretStore...");
+    
+    // Load GitHub token from Shuttle secrets
+    if let Some(token) = secrets.get("GITHUB_TOKEN") {
+        std::env::set_var("GITHUB_TOKEN", &token);
+        println!("🔑 GitHub token loaded from Shuttle secrets ({}...)", &token[..token.len().min(8)]);
+    } else {
+        println!("⚠️  No GitHub token found in Shuttle secrets");
+    }
+
+    // Load DeepSeek API key from Shuttle secrets
+    if let Some(deepseek_key) = secrets.get("DEEPSEEK_API_KEY") {
+        std::env::set_var("DEEPSEEK_API_KEY", &deepseek_key);
+        println!("🤖 DeepSeek API key loaded from Shuttle secrets");
+    } else {
+        println!("⚠️  No DeepSeek API key found in Shuttle secrets");
+    }
+
+    // Load OpenAI API key from Shuttle secrets (optional)
+    if let Some(openai_key) = secrets.get("OPENAI_API_KEY") {
+        std::env::set_var("OPENAI_API_KEY", &openai_key);
+        println!("🤖 OpenAI API key loaded from Shuttle secrets");
+    }
+
+    // Load database URL from Shuttle secrets (optional)
+    if let Some(database_url) = secrets.get("DATABASE_URL") {
+        std::env::set_var("DATABASE_URL", &database_url);
+        println!("🗄️  Database URL loaded from Shuttle secrets");
+    }
+
+    // Load other optional API keys
+    if let Some(resend_key) = secrets.get("RESEND_API_KEY") {
+        std::env::set_var("RESEND_API_KEY", &resend_key);
+        println!("📧 Resend API key loaded from Shuttle secrets");
+    }
+
+    if let Some(clerk_key) = secrets.get("CLERK_SECRET_KEY") {
+        std::env::set_var("CLERK_SECRET_KEY", &clerk_key);
+        println!("🔐 Clerk secret key loaded from Shuttle secrets");
+    }
+
+    if let Some(neverbounce_key) = secrets.get("NEVERBOUNCE_API_KEY") {
+        std::env::set_var("NEVERBOUNCE_API_KEY", &neverbounce_key);
+        println!("📋 NeverBounce API key loaded from Shuttle secrets");
+    }
+
+    println!("✅ Secrets loading completed");
+    
     Ok(MyService {})
 }
 
@@ -253,55 +304,6 @@ async fn run_autopatcher() -> Result<()> {
 
     // Load configuration
     println!("📋 Loading configuration...");
-
-    // Debug environment variables related to secrets
-    println!("📋 Debugging environment variables...");
-    println!(
-        "   GITHUB_TOKEN present: {}",
-        std::env::var("GITHUB_TOKEN").is_ok()
-    );
-    println!(
-        "   DEEPSEEK_API_KEY present: {}",
-        std::env::var("DEEPSEEK_API_KEY").is_ok()
-    );
-    if let Ok(token) = std::env::var("GITHUB_TOKEN") {
-        println!(
-            "   GITHUB_TOKEN value (first 8 chars): {}...",
-            &token[..token.len().min(8)]
-        );
-    }
-
-    // Try to load from Secrets.toml directly if environment variables are missing
-    if std::env::var("GITHUB_TOKEN").is_err() {
-        println!("📋 GITHUB_TOKEN not in env, attempting to load from Secrets.toml...");
-        if let Ok(secrets_content) = std::fs::read_to_string("Secrets.toml") {
-            println!("📋 Secrets.toml file found, parsing...");
-            for line in secrets_content.lines() {
-                if line.starts_with("GITHUB_TOKEN") && line.contains('=') {
-                    let parts: Vec<&str> = line.split('=').collect();
-                    if parts.len() == 2 {
-                        let token = parts[1].trim().trim_matches('"');
-                        std::env::set_var("GITHUB_TOKEN", token);
-                        println!(
-                            "📋 Set GITHUB_TOKEN from Secrets.toml ({}...)",
-                            &token[..token.len().min(8)]
-                        );
-                    }
-                }
-                if line.starts_with("DEEPSEEK_API_KEY") && line.contains('=') {
-                    let parts: Vec<&str> = line.split('=').collect();
-                    if parts.len() == 2 {
-                        let token = parts[1].trim().trim_matches('"');
-                        std::env::set_var("DEEPSEEK_API_KEY", token);
-                        println!("📋 Set DEEPSEEK_API_KEY from Secrets.toml");
-                    }
-                }
-            }
-        } else {
-            println!("📋 Secrets.toml file not found or not readable");
-        }
-    }
-
     let config = Config::from_env();
     println!("📋 Configuration loaded successfully");
 
