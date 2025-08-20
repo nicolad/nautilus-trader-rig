@@ -41,7 +41,7 @@ impl DeepSeekClient {
 
     pub fn from_env() -> Result<Self> {
         let api_key = std::env::var("DEEPSEEK_API_KEY")
-            .context("DEEPSEEK_API_KEY environment variable not set")?;
+            .map_err(|_| anyhow!("DEEPSEEK_API_KEY environment variable not set"))?;
         let client = providers::deepseek::Client::new(&api_key);
         Ok(Self { client })
     }
