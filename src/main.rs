@@ -338,7 +338,7 @@ Input:
             // Capture a failing build log to feed back next time (best-effort on first candidate).
             last_build_output = Some(
                 parsed
-                    .get(0)
+                    .first()
                     .and_then(|p| try_build_and_test_in_temp(&cfg, p).ok())
                     .map(|ce| ce.build_stderr)
                     .unwrap_or_default(),
