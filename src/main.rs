@@ -8,10 +8,7 @@
 // - avoids file corruption with transactional, atomic writes + backups + rollback.
 
 use anyhow::{anyhow, Context, Result};
-use apalis::prelude::*;
-use apalis_cron::CronStream;
-use apalis_cron::Schedule;
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use dotenvy::dotenv;
 use rayon::prelude::*;
 use regex::Regex;
@@ -19,19 +16,18 @@ use rig::prelude::*;
 use rig::{completion::Prompt, providers};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use shuttle_runtime::SecretStore;
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::ffi::OsStr;
 use std::fs;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::str::FromStr;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use tokio::time;
 use walkdir::WalkDir;
 
 mod config;
-use config::{AutopatcherConfig, Config};
+use config::{AutopatcherConfig, Config, GitConfig};
 
 /// DeepSeek client using rig framework
 pub struct DeepSeekClient {
@@ -128,25 +124,63 @@ struct PlanningInput {
     candidates: usize,
 }
 
-#[shuttle_runtime::main]
-async fn main(
-    #[Cron("0 */6 * * *")] _cron: Cron, // Run every 6 hours
-    #[shuttle_runtime::Secrets] secrets: SecretStore,
-) -> shuttle_cron::CronService {
-    // Set up environment from secrets
-    if let Some(api_key) = secrets.get("DEEPSEEK_API_KEY") {
-        std::env::set_var("DEEPSEEK_API_KEY", api_key);
+// Cron job implementation
+async fn run_autopatcher_job() {
+    println!("🔄 Starting autopatcher job at: {:?}", Utc::now());
+
+    // Load environment variables
+    dotenv().ok();
+
+    match run_autopatcher().await {
+        Ok(_) => println!("✅ Autopatcher job completed successfully"),
+        Err(e) => eprintln!("❌ Autopatcher job failed: {}", e),
     }
+}
 
-    let handler = move || {
-        Box::pin(async move {
-            if let Err(e) = run_autopatcher().await {
-                tracing::error!("Autopatcher failed: {}", e);
-            }
-        })
-    };
+#[shuttle_runtime::main]
+async fn main() -> Result<MyService, shuttle_runtime::Error> {
+    Ok(MyService {})
+}
 
-    shuttle_cron::CronService::new(handler)
+// Simple service structure
+struct MyService {}
+
+#[shuttle_runtime::async_trait]
+impl shuttle_runtime::Service for MyService {
+    async fn bind(self, _addr: std::net::SocketAddr) -> Result<(), shuttle_runtime::Error> {
+        println!("🚀 Starting Nautilus Trader Autopatcher with Tokio Timer...");
+
+        // Load configuration
+        let config = Config::from_env();
+
+        // Parse interval from cron schedule - for "0 */5 * * * *" we want 5 minutes
+        let interval_minutes = if config.cron.schedule == "0 */5 * * * *" {
+            5
+        } else {
+            // Default to 5 minutes if we can't parse the schedule
+            println!(
+                "⚠️  Using default 5-minute interval for non-standard schedule: {}",
+                config.cron.schedule
+            );
+            5
+        };
+
+        println!("📅 Schedule: Every {} minutes", interval_minutes);
+
+        // Create tokio interval for the specified minutes
+        let mut interval = time::interval(Duration::from_secs(interval_minutes * 60));
+
+        // Run first execution immediately
+        println!("🎯 Running first execution immediately...");
+        run_autopatcher_job().await;
+
+        // Then run on schedule
+        loop {
+            interval.tick().await;
+            println!("⏰ Timer triggered - running autopatcher job...");
+            run_autopatcher_job().await;
+        }
+    }
 }
 
 async fn run_autopatcher() -> Result<()> {
@@ -185,12 +219,29 @@ async fn run_autopatcher() -> Result<()> {
     println!("   Parallel jobs: {}", cfg.jobs);
     println!("   Max files in snapshot: {}", cfg.snapshot_max_files);
     println!("   Max bytes per file: {}", cfg.snapshot_max_bytes);
+
+    // Git configuration info
+    if let Some(token) = &config.git.github_token {
+        println!(
+            "   🔐 GitHub token: configured ({}...)",
+            &token[..token.len().min(8)]
+        );
+    } else {
+        println!("   🔐 GitHub token: not configured");
+    }
+    println!(
+        "   👤 Git user: {} <{}>",
+        config.git.user_name, config.git.user_email
+    );
+    println!("   🚫 Excluded files: {:?}", config.git.excluded_files);
     println!();
 
-    run(cfg).await
+    run(&config).await
 }
 
-async fn run(cfg: &AutopatcherConfig) -> Result<()> {
+async fn run(config: &Config) -> Result<()> {
+    let cfg = &config.autopatcher;
+
     println!("🔍 Checking prerequisites...");
 
     ensure_command_exists("git").context("`git` is required in PATH")?;
@@ -399,15 +450,15 @@ Input:
             println!("   ✅ Patch applied successfully");
 
             println!("📝 Committing changes...");
-            ensure_git_repo(&cfg.target)?;
-            git_add_all(&cfg.target)?;
+            ensure_git_repo(&cfg.target, &config.git)?;
+            git_add_all_filtered(&cfg.target, &config.git)?;
             let commit_msg = format!("{} [autopatch]\n\n{}", ps.title.trim(), ps.rationale.trim());
-            git_commit(&cfg.target, &commit_msg)?;
+            git_commit_with_config(&cfg.target, &commit_msg, &config.git)?;
             println!("🎉 Committed successfully!");
             println!("   💾 Commit message: {}", ps.title.trim());
 
             println!("📤 Pushing changes...");
-            git_push(&cfg.target)?;
+            git_push_with_token(&cfg.target, &config.git)?;
             println!("🚀 Pushed successfully!");
 
             last_build_output = None;
@@ -442,6 +493,15 @@ Output strictly valid JSON for { "patches": PatchSet[] }.
 Use only the provided edit kinds. Avoid broad matches in search/replace.
 Prefer adding tests under `tests/` as `smoke_*` or minimal `#[cfg(test)]` modules.
 Pay attention to any instructions provided - they contain guidance for what improvements to focus on.
+
+IMPORTANT: NEVER modify these protected files:
+- .gitignore (git configuration)
+- Secrets.toml (sensitive configuration)
+- .env files (environment variables)
+- *.pem, *.key files (cryptographic keys)
+- Any file containing secrets, tokens, or credentials
+
+Focus on code quality improvements, bug fixes, documentation, and tests only.
 "#;
 
 /// Read the INSTRUCTIONS.md file if it exists.
@@ -1024,7 +1084,7 @@ fn run_cargo_capture(root: &Path, args: &[&str]) -> Result<std::process::Output>
         .output()?)
 }
 
-fn ensure_git_repo(root: &Path) -> Result<()> {
+fn ensure_git_repo(root: &Path, git_config: &GitConfig) -> Result<()> {
     let inside = Command::new("git")
         .args(["rev-parse", "--is-inside-work-tree"])
         .current_dir(root)
@@ -1039,8 +1099,159 @@ fn ensure_git_repo(root: &Path) -> Result<()> {
     }
 
     Command::new("git").arg("init").current_dir(root).status()?;
-    git_add_all(root)?;
-    git_commit(root, "chore: initial commit [autopatch]")?;
+    git_add_all_filtered(root, git_config)?;
+    git_commit_with_config(root, "chore: initial commit [autopatch]", git_config)?;
+    Ok(())
+}
+
+/// Enhanced git functions that use GitConfig for authentication and configuration
+
+fn configure_git_user(root: &Path, git_config: &GitConfig) -> Result<()> {
+    // Configure git user name
+    let ok = Command::new("git")
+        .args(["config", "user.name", &git_config.user_name])
+        .current_dir(root)
+        .status()?
+        .success();
+    if !ok {
+        return Err(anyhow!("Failed to configure git user.name"));
+    }
+
+    // Configure git user email
+    let ok = Command::new("git")
+        .args(["config", "user.email", &git_config.user_email])
+        .current_dir(root)
+        .status()?
+        .success();
+    if !ok {
+        return Err(anyhow!("Failed to configure git user.email"));
+    }
+
+    println!(
+        "   ✅ Configured git user: {} <{}>",
+        git_config.user_name, git_config.user_email
+    );
+    Ok(())
+}
+
+fn git_add_all_filtered(root: &Path, git_config: &GitConfig) -> Result<()> {
+    // First, get all staged and unstaged files
+    let output = Command::new("git")
+        .args(["ls-files", "--modified", "--others", "--exclude-standard"])
+        .current_dir(root)
+        .output()?;
+
+    if !output.status.success() {
+        return Err(anyhow!("Failed to list git files"));
+    }
+
+    let files_to_add: Vec<String> = String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .filter(|file| !git_config.is_excluded(file))
+        .map(|s| s.to_string())
+        .collect();
+
+    if files_to_add.is_empty() {
+        println!("   ℹ️  No files to add (all excluded or no changes)");
+        return Ok(());
+    }
+
+    println!(
+        "   📝 Adding {} files (excluding protected files)",
+        files_to_add.len()
+    );
+    for file in &files_to_add {
+        if git_config.is_excluded(file) {
+            println!("      🚫 Skipping excluded file: {}", file);
+            continue;
+        }
+
+        let ok = Command::new("git")
+            .args(["add", file])
+            .current_dir(root)
+            .status()?
+            .success();
+        if !ok {
+            return Err(anyhow!("git add failed for file: {}", file));
+        }
+        println!("      ✅ Added: {}", file);
+    }
+
+    Ok(())
+}
+
+fn git_commit_with_config(root: &Path, msg: &str, git_config: &GitConfig) -> Result<()> {
+    // Configure git user first
+    configure_git_user(root, git_config)?;
+
+    let ok = Command::new("git")
+        .args(["commit", "-m", msg])
+        .current_dir(root)
+        .status()?
+        .success();
+    if !ok {
+        return Err(anyhow!("git commit failed"));
+    }
+    Ok(())
+}
+
+fn git_push_with_token(root: &Path, git_config: &GitConfig) -> Result<()> {
+    // Check if GitHub token is available
+    let github_token = match &git_config.github_token {
+        Some(token) if !token.is_empty() => token,
+        _ => {
+            println!("ℹ️  No GitHub token configured; skipping authenticated push.");
+            return git_push(root); // Fall back to regular push
+        }
+    };
+
+    // Get the current remote URL
+    let remote_output = Command::new("git")
+        .args(["remote", "get-url", "origin"])
+        .current_dir(root)
+        .output()?;
+
+    if !remote_output.status.success() {
+        println!("ℹ️  No origin remote configured; skipping push.");
+        return Ok(());
+    }
+
+    let remote_url_raw = String::from_utf8_lossy(&remote_output.stdout);
+    let remote_url = remote_url_raw.trim();
+
+    // Convert SSH URL to HTTPS if needed
+    let https_url = if remote_url.starts_with("git@github.com:") {
+        remote_url.replace("git@github.com:", "https://github.com/")
+    } else if remote_url.starts_with("https://github.com/") {
+        remote_url.to_string()
+    } else {
+        println!("ℹ️  Remote URL is not a GitHub repository; skipping authenticated push.");
+        return git_push(root);
+    };
+
+    // Create authenticated URL
+    let auth_url = format!(
+        "https://{}@github.com/{}",
+        github_token,
+        https_url.trim_start_matches("https://github.com/")
+    );
+
+    println!("   🔐 Pushing with GitHub token authentication...");
+
+    // Push with authentication
+    let ok = Command::new("git")
+        .args(["push", &auth_url])
+        .current_dir(root)
+        .env("GIT_TERMINAL_PROMPT", "0") // Disable interactive prompts
+        .status()?
+        .success();
+
+    if !ok {
+        println!("   ⚠️  Authenticated push failed, trying regular push...");
+        return git_push(root);
+    }
+
+    println!("   ✅ Successfully pushed with GitHub token");
     Ok(())
 }
 
