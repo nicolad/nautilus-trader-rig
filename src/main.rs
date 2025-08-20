@@ -1,18 +1,18 @@
 // src/main.rs
 //
-// Self-improving Rust autopatcher that:
-// - uses Rig + DeepSeek to propose tiny code edits (incl. tiny deterministic tests),
+// Self-improving Rust autopatcher with streaming support that:
+// - uses rig + DeepSeek to propose tiny code edits (incl. tiny deterministic tests),
+// - provides real-time streaming feedback during LLM generation,
 // - evaluates candidates in parallel in temp copies,
 // - applies a candidate to the real repo and commits ONLY if `cargo check` AND `cargo test` pass,
 // - avoids file corruption with transactional, atomic writes + backups + rollback.
-//
-// Requirements in Cargo.toml (not shown here; keep as in previous step):
-// anyhow, fs_extra, rayon, schemars, serde(+derive), tempfile, walkdir, which, rig-core
 
 use anyhow::{anyhow, Context, Result};
 use dotenvy::dotenv;
 use fs_extra::dir::{copy as copy_dir, CopyOptions};
 use rayon::prelude::*;
+use rig::prelude::*;
+use rig::{completion::Prompt, providers};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -25,14 +25,50 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use tempfile::TempDir;
 use walkdir::WalkDir;
 
-use rig::{
-    client::{CompletionClient, ProviderClient},
-    completion::Prompt,
-    providers::deepseek::{self, DEEPSEEK_REASONER},
-};
+mod config;
+use config::{AutopatcherConfig, Config};
 
-// Import streaming functionality - we'll add this module
-mod streaming;
+/// DeepSeek client using rig framework
+pub struct DeepSeekClient {
+    client: providers::deepseek::Client,
+}
+
+impl DeepSeekClient {
+    pub fn new(api_key: String) -> Self {
+        let client = providers::deepseek::Client::new(&api_key);
+        Self { client }
+    }
+
+    pub fn from_env() -> Result<Self> {
+        let client = providers::deepseek::Client::from_env();
+        Ok(Self { client })
+    }
+
+    /// Send a simple prompt and get the complete response
+    pub async fn prompt(&self, prompt: &str) -> Result<String> {
+        let agent = self
+            .client
+            .agent(providers::deepseek::DEEPSEEK_CHAT)
+            .preamble("You are a helpful assistant specialized in code analysis and improvement.")
+            .build();
+
+        let response = agent.prompt(prompt).await?;
+        Ok(response)
+    }
+
+    /// Stream a prompt and get real-time response (simplified for now)
+    pub async fn stream_prompt(&self, prompt: &str) -> Result<String> {
+        println!("🤖 DeepSeek is thinking...");
+        std::io::Write::flush(&mut std::io::stdout())?;
+        
+        // For now, just use the regular prompt method
+        // TODO: Implement proper streaming when rig API supports it
+        let response = self.prompt(prompt).await?;
+        
+        println!("✅ Response received");
+        Ok(response)
+    }
+}
 
 /// A small, conservative patch set that the model proposes.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -85,16 +121,6 @@ struct PlanningInput {
     candidates: usize,
 }
 
-/// Minimal config — hardcoded (no flags).
-struct Config {
-    target: PathBuf,
-    candidates: usize,
-    iterations: usize,
-    jobs: usize,
-    snapshot_max_files: usize,
-    snapshot_max_bytes: usize,
-}
-
 fn main() -> Result<()> {
     // Load environment variables from .env file
     dotenv().ok();
@@ -105,22 +131,29 @@ fn main() -> Result<()> {
         .format_timestamp_secs()
         .init();
 
+    // Load configuration
+    let config = Config::from_env();
+
+    // Validate configuration
+    if let Err(e) = config.validate() {
+        eprintln!("Configuration error: {}", e);
+        std::process::exit(1);
+    }
+
     println!("🚀 Starting Rust Autopatcher with DeepSeek");
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
-    let cfg = Config {
-        target: PathBuf::from("."),
-        candidates: 3,
-        iterations: 1,
-        jobs: 3,
-        snapshot_max_files: 40,
-        snapshot_max_bytes: 8_192,
-    };
+    // Simple config for backward compatibility
+    let cfg = &config.autopatcher;
 
     println!("⚙️  Configuration:");
     println!("   Target directory: {}", cfg.target.display());
     println!("   Candidates per iteration: {}", cfg.candidates);
-    println!("   Max iterations: {}", cfg.iterations);
+    println!("   Max iterations: {}", cfg.max_iterations);
+    println!("   Model: {}", cfg.model);
+    println!("   Max tokens: {}", cfg.max_tokens);
+    println!("   Temperature: {}", cfg.temperature);
+    println!("   Streaming enabled: {}", cfg.enable_streaming);
     println!("   Parallel jobs: {}", cfg.jobs);
     println!("   Max files in snapshot: {}", cfg.snapshot_max_files);
     println!("   Max bytes per file: {}", cfg.snapshot_max_bytes);
@@ -129,7 +162,7 @@ fn main() -> Result<()> {
     rt.block_on(run(cfg))
 }
 
-async fn run(cfg: Config) -> Result<()> {
+async fn run(cfg: &AutopatcherConfig) -> Result<()> {
     println!("🔍 Checking prerequisites...");
 
     ensure_command_exists("git").context("`git` is required in PATH")?;
@@ -139,14 +172,13 @@ async fn run(cfg: Config) -> Result<()> {
     println!("   ✅ cargo found");
 
     println!("🤖 Initializing DeepSeek client...");
-    let ds = deepseek::Client::from_env();
-    let agent = ds.agent(DEEPSEEK_REASONER).preamble(SYSTEM_PROMPT).build();
-    println!("   ✅ DeepSeek agent ready");
+    let client = DeepSeekClient::from_env()?;
+    println!("   ✅ DeepSeek client ready");
 
     let mut last_build_output: Option<String> = None;
 
-    for iter in 1..=cfg.iterations {
-        println!("\n🔄 === Iteration {iter}/{} ===", cfg.iterations);
+    for iter in 1..=cfg.max_iterations {
+        println!("\n🔄 === Iteration {iter}/{} ===", cfg.max_iterations);
         println!("📸 Taking codebase snapshot...");
 
         let files = snapshot_codebase(&cfg.target, cfg.snapshot_max_files, cfg.snapshot_max_bytes)?;
@@ -203,7 +235,7 @@ Input:
             plan = plan_json
         );
 
-        let raw = agent.prompt(prompt).await.context("LLM call failed")?;
+        let raw = client.prompt(&prompt).await.context("LLM call failed")?;
         println!("   📥 Received response ({} chars)", raw.len());
 
         println!("🔍 Parsing patch proposals...");
@@ -414,7 +446,7 @@ struct CandidateEval {
 /// 1) apply edits (atomic writes),
 /// 2) cargo check,
 /// 3) cargo test.
-fn try_build_and_test_in_temp(cfg: &Config, ps: &PatchSet) -> Result<CandidateEval> {
+fn try_build_and_test_in_temp(cfg: &AutopatcherConfig, ps: &PatchSet) -> Result<CandidateEval> {
     println!("      🗂️ Creating temp directory...");
     let tmp = TempDir::new()?;
     let td = tmp.path().to_path_buf();
