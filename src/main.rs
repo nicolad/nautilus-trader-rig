@@ -253,6 +253,55 @@ async fn run_autopatcher() -> Result<()> {
 
     // Load configuration
     println!("📋 Loading configuration...");
+
+    // Debug environment variables related to secrets
+    println!("📋 Debugging environment variables...");
+    println!(
+        "   GITHUB_TOKEN present: {}",
+        std::env::var("GITHUB_TOKEN").is_ok()
+    );
+    println!(
+        "   DEEPSEEK_API_KEY present: {}",
+        std::env::var("DEEPSEEK_API_KEY").is_ok()
+    );
+    if let Ok(token) = std::env::var("GITHUB_TOKEN") {
+        println!(
+            "   GITHUB_TOKEN value (first 8 chars): {}...",
+            &token[..token.len().min(8)]
+        );
+    }
+
+    // Try to load from Secrets.toml directly if environment variables are missing
+    if std::env::var("GITHUB_TOKEN").is_err() {
+        println!("📋 GITHUB_TOKEN not in env, attempting to load from Secrets.toml...");
+        if let Ok(secrets_content) = std::fs::read_to_string("Secrets.toml") {
+            println!("📋 Secrets.toml file found, parsing...");
+            for line in secrets_content.lines() {
+                if line.starts_with("GITHUB_TOKEN") && line.contains('=') {
+                    let parts: Vec<&str> = line.split('=').collect();
+                    if parts.len() == 2 {
+                        let token = parts[1].trim().trim_matches('"');
+                        std::env::set_var("GITHUB_TOKEN", token);
+                        println!(
+                            "📋 Set GITHUB_TOKEN from Secrets.toml ({}...)",
+                            &token[..token.len().min(8)]
+                        );
+                    }
+                }
+                if line.starts_with("DEEPSEEK_API_KEY") && line.contains('=') {
+                    let parts: Vec<&str> = line.split('=').collect();
+                    if parts.len() == 2 {
+                        let token = parts[1].trim().trim_matches('"');
+                        std::env::set_var("DEEPSEEK_API_KEY", token);
+                        println!("📋 Set DEEPSEEK_API_KEY from Secrets.toml");
+                    }
+                }
+            }
+        } else {
+            println!("📋 Secrets.toml file not found or not readable");
+        }
+    }
+
     let config = Config::from_env();
     println!("📋 Configuration loaded successfully");
 
