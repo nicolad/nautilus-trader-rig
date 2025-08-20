@@ -45,18 +45,7 @@ impl Default for AutopatcherConfig {
 impl AutopatcherConfig {
     /// Load configuration from environment variables and defaults
     pub fn from_env() -> Self {
-        Self {
-            model: "deepseek-chat".to_string(),
-            max_tokens: 4000,
-            temperature: 0.1,
-            max_iterations: 5,
-            enable_streaming: true,
-            target: PathBuf::from("."),
-            candidates: 3,
-            jobs: 3,
-            snapshot_max_files: 40,
-            snapshot_max_bytes: 8_192,
-        }
+        Self::default()
     }
 
     /// Validate the configuration
