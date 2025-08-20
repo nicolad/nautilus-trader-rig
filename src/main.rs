@@ -223,10 +223,10 @@ async fn run_autopatcher() -> Result<()> {
 
     // Initialize logging with detailed output (only if not running on Shuttle)
     // Shuttle has its own tracing subscriber that conflicts with env_logger
-    let is_shuttle = std::env::var("SHUTTLE").is_ok() || 
-                     std::env::var("SHUTTLE_PROJECT_ID").is_ok() || 
-                     std::env::var("SHUTTLE_SERVICE_NAME").is_ok();
-    
+    let is_shuttle = std::env::var("SHUTTLE").is_ok()
+        || std::env::var("SHUTTLE_PROJECT_ID").is_ok()
+        || std::env::var("SHUTTLE_SERVICE_NAME").is_ok();
+
     if is_shuttle {
         println!("📋 Running on Shuttle - skipping env_logger initialization");
         println!("📋 Using Shuttle's built-in tracing subscriber");
@@ -241,10 +241,13 @@ async fn run_autopatcher() -> Result<()> {
         match env_logger::Builder::from_default_env()
             .filter_level(log::LevelFilter::Info)
             .format_timestamp_secs()
-            .try_init() 
+            .try_init()
         {
             Ok(_) => println!("📋 Logger initialized successfully"),
-            Err(e) => println!("📋 Logger initialization failed (probably already initialized): {}", e),
+            Err(e) => println!(
+                "📋 Logger initialization failed (probably already initialized): {}",
+                e
+            ),
         }
     }
 
