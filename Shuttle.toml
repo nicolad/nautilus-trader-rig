@@ -2,3 +2,11 @@
 name = "nautilus-trader-rig"
 description = "Autopatcher service using rig + DeepSeek for automated code improvements"
 
+[build]
+assets = [
+  "INSTRUCTIONS.md",     # Include the instructions file
+  "src/*",               # Include source files for analysis
+  "Cargo.toml",          # Include cargo manifest
+  "*.md",                # Include all markdown files
+]
+
