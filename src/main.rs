@@ -15,6 +15,8 @@ use rig::prelude::*;
 use rig::{completion::Prompt, providers};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use shuttle_cron::Cron;
+use shuttle_runtime::SecretStore;
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::ffi::OsStr;
 use std::fs;
@@ -455,20 +457,29 @@ fn try_build_and_test_in_temp(cfg: &AutopatcherConfig, ps: &PatchSet) -> Result<
     let worktrees_root = cfg.target.join(".autopatch_worktrees");
     fs::create_dir_all(&worktrees_root)?;
     let ts = SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis();
-    let name = format!("wt-{}-{}", std::process::id(), ts);
+    let thread_id = std::thread::current().id();
+    let name = format!("wt-{:?}-{}-{}", thread_id, std::process::id(), ts);
     let wt_dir = worktrees_root.join(&name);
 
+    // Clean up any existing worktree with same name first
+    let _ = Command::new("git")
+        .args(["worktree", "remove", "-f"])
+        .arg(&wt_dir)
+        .current_dir(&cfg.target)
+        .output();
+
     // `git worktree add --detach <dir> HEAD`
-    let ok = Command::new("git")
+    let output = Command::new("git")
         .args(["worktree", "add", "--detach"])
         .arg(&wt_dir)
         .arg("HEAD")
         .current_dir(&cfg.target)
-        .status()
-        .context("git worktree add failed")?
-        .success();
-    if !ok {
-        return Err(anyhow!("git worktree add failed"));
+        .output()
+        .context("git worktree add command failed")?;
+    
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(anyhow!("git worktree add failed: {}", stderr));
     }
     println!("         📁 {}", wt_dir.display());
 
@@ -480,7 +491,7 @@ fn try_build_and_test_in_temp(cfg: &AutopatcherConfig, ps: &PatchSet) -> Result<
                 .args(["worktree", "remove", "-f"])
                 .arg(&self.path)
                 .current_dir(&self.repo)
-                .status();
+                .output();
             let _ = fs::remove_dir_all(&self.path);
         }
     }

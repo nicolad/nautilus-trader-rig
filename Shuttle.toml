@@ -1,4 +1,4 @@
 [package]
-name = "shuttle-cron-gh"
-description = "Blockchain repository cron job service that monitors GitHub issues"
+name = "nautilus-trader-rig"
+description = "Autopatcher service using rig + DeepSeek for automated code improvements"
 
