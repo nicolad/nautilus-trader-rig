@@ -8,6 +8,10 @@
 // - avoids file corruption with transactional, atomic writes + backups + rollback.
 
 use anyhow::{anyhow, Context, Result};
+use apalis::prelude::*;
+use apalis_cron::CronStream;
+use apalis_cron::Schedule;
+use chrono::{DateTime, Utc};
 use dotenvy::dotenv;
 use rayon::prelude::*;
 use regex::Regex;
@@ -15,7 +19,6 @@ use rig::prelude::*;
 use rig::{completion::Prompt, providers};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use shuttle_cron::Cron;
 use shuttle_runtime::SecretStore;
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::ffi::OsStr;
@@ -23,6 +26,7 @@ use std::fs;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::str::FromStr;
 use std::time::{SystemTime, UNIX_EPOCH};
 use walkdir::WalkDir;
 
@@ -124,7 +128,28 @@ struct PlanningInput {
     candidates: usize,
 }
 
-fn main() -> Result<()> {
+#[shuttle_runtime::main]
+async fn main(
+    #[Cron("0 */6 * * *")] _cron: Cron, // Run every 6 hours
+    #[shuttle_runtime::Secrets] secrets: SecretStore,
+) -> shuttle_cron::CronService {
+    // Set up environment from secrets
+    if let Some(api_key) = secrets.get("DEEPSEEK_API_KEY") {
+        std::env::set_var("DEEPSEEK_API_KEY", api_key);
+    }
+
+    let handler = move || {
+        Box::pin(async move {
+            if let Err(e) = run_autopatcher().await {
+                tracing::error!("Autopatcher failed: {}", e);
+            }
+        })
+    };
+
+    shuttle_cron::CronService::new(handler)
+}
+
+async fn run_autopatcher() -> Result<()> {
     // Load environment variables from .env file
     dotenv().ok();
 
@@ -140,7 +165,7 @@ fn main() -> Result<()> {
     // Validate configuration
     if let Err(e) = config.validate() {
         eprintln!("Configuration error: {}", e);
-        std::process::exit(1);
+        return Err(anyhow!("Configuration error: {}", e));
     }
 
     println!("🚀 Starting Rust Autopatcher with DeepSeek");
@@ -161,8 +186,8 @@ fn main() -> Result<()> {
     println!("   Max files in snapshot: {}", cfg.snapshot_max_files);
     println!("   Max bytes per file: {}", cfg.snapshot_max_bytes);
     println!();
-    let rt = tokio::runtime::Runtime::new()?;
-    rt.block_on(run(cfg))
+
+    run(cfg).await
 }
 
 async fn run(cfg: &AutopatcherConfig) -> Result<()> {
@@ -476,7 +501,7 @@ fn try_build_and_test_in_temp(cfg: &AutopatcherConfig, ps: &PatchSet) -> Result<
         .current_dir(&cfg.target)
         .output()
         .context("git worktree add command failed")?;
-    
+
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         return Err(anyhow!("git worktree add failed: {}", stderr));
@@ -484,7 +509,10 @@ fn try_build_and_test_in_temp(cfg: &AutopatcherConfig, ps: &PatchSet) -> Result<
     println!("         📁 {}", wt_dir.display());
 
     // Ensure cleanup even on early returns.
-    struct WorktreeGuard { repo: PathBuf, path: PathBuf }
+    struct WorktreeGuard {
+        repo: PathBuf,
+        path: PathBuf,
+    }
     impl Drop for WorktreeGuard {
         fn drop(&mut self) {
             let _ = Command::new("git")
@@ -495,7 +523,10 @@ fn try_build_and_test_in_temp(cfg: &AutopatcherConfig, ps: &PatchSet) -> Result<
             let _ = fs::remove_dir_all(&self.path);
         }
     }
-    let _guard = WorktreeGuard { repo: cfg.target.clone(), path: wt_dir.clone() };
+    let _guard = WorktreeGuard {
+        repo: cfg.target.clone(),
+        path: wt_dir.clone(),
+    };
 
     println!("      ⚡ Applying patches in worktree...");
     apply_patchset_atomic_only(&wt_dir, ps)?;
@@ -519,7 +550,10 @@ fn try_build_and_test_in_temp(cfg: &AutopatcherConfig, ps: &PatchSet) -> Result<
         joined = format!("{}[...truncated...]", &joined[joined.len() - 64 * 1024..]);
     }
     build_stderr.push_str(&joined);
-    println!("         {} cargo check", if check_ok { "✅" } else { "❌" });
+    println!(
+        "         {} cargo check",
+        if check_ok { "✅" } else { "❌" }
+    );
 
     let tests_ok = if check_ok {
         println!("      🧪 Running cargo test (JSON)...");
@@ -541,7 +575,11 @@ fn try_build_and_test_in_temp(cfg: &AutopatcherConfig, ps: &PatchSet) -> Result<
         false
     };
 
-    Ok(CandidateEval { check_ok, tests_ok, build_stderr })
+    Ok(CandidateEval {
+        check_ok,
+        tests_ok,
+        build_stderr,
+    })
 }
 
 // Helper: like run_cargo_capture, but with extra env vars.
@@ -821,10 +859,7 @@ fn snapshot_codebase_smart(
         error_paths.extend(extract_paths_from_human_diagnostics(raw));
     }
     // Keep only files existing under root.
-    let error_paths: Vec<PathBuf> = error_paths
-        .into_iter()
-        .filter(|p| p.exists())
-        .collect();
+    let error_paths: Vec<PathBuf> = error_paths.into_iter().filter(|p| p.exists()).collect();
 
     priority.extend(error_paths);
 
@@ -890,7 +925,11 @@ fn parse_cargo_message_path(line: &str) -> Result<HashSet<PathBuf>> {
         if let cargo_metadata::Message::CompilerMessage(cm) = msg {
             let diag = cm.message;
             for span in diag.spans {
-                if let Some(file) = span.file_name.strip_prefix("./").or_else(|| Some(&span.file_name)) {
+                if let Some(file) = span
+                    .file_name
+                    .strip_prefix("./")
+                    .or_else(|| Some(&span.file_name))
+                {
                     paths.insert(PathBuf::from(file));
                 }
             }
