@@ -371,10 +371,9 @@ async fn run(config: &Config) -> Result<()> {
     ensure_command_exists("git").context("`git` is required in PATH")?;
     println!("   ✅ git found");
 
-    // Skip cargo validation in deployed environment
-    // The application has already been built and tested during the build process
-    println!("📋 Skipping cargo validation in deployed environment");
-    println!("   ⚠️  Cargo checks are disabled in production mode");
+    println!("📋 Checking cargo command...");
+    ensure_command_exists("cargo").context("`cargo` is required in PATH")?;
+    println!("   ✅ cargo found");
 
     println!("🔧 Configuring parallelism ({} jobs)...", cfg.jobs);
     init_global_rayon(cfg.jobs);
@@ -383,21 +382,8 @@ async fn run(config: &Config) -> Result<()> {
     println!("🤖 Initializing DeepSeek client...");
     println!("📋 Checking for DEEPSEEK_API_KEY environment variable...");
 
-    // List all environment variables for debugging
-    println!("📋 Available environment variables:");
-    for (key, value) in std::env::vars() {
-        if key.contains("API") || key.contains("TOKEN") || key.contains("KEY") {
-            println!(
-                "   {}: {}",
-                key,
-                if value.len() > 10 {
-                    format!("{}...", &value[..10])
-                } else {
-                    "***".to_string()
-                }
-            );
-        }
-    }
+    // Environment variables loaded - not logging for security
+    println!("📋 Environment variables loaded successfully");
 
     if std::env::var("DEEPSEEK_API_KEY").is_err() {
         eprintln!("❌ DEEPSEEK_API_KEY environment variable not found");
@@ -718,14 +704,53 @@ fn try_build_and_test_shuttle(cfg: &AutopatcherConfig, ps: &PatchSet) -> Result<
     apply_patchset_atomic_only(&temp_dir, ps)?;
     println!("         ✅ Patches applied");
 
-    // In Shuttle, skip cargo validation to avoid issues
-    println!("      🏭 Shuttle environment - skipping cargo validation");
-    println!("         ⚠️  Cargo checks disabled in production environment");
+    // Per-candidate target dir to avoid parallel lock contention.
+    let target_dir = temp_dir.join("target");
+    let target_dir_str = target_dir.to_string_lossy();
+    let envs = [("CARGO_TARGET_DIR", target_dir_str.as_ref())];
+
+    println!("      🔍 Running cargo check (JSON) in Shuttle...");
+    let check_out = run_cargo_capture_env(&temp_dir, &["check", "--message-format=json"], &envs)?;
+    let check_ok = check_out.status.success();
+    let mut build_stderr = String::new();
+
+    // Capture a compact build log: prefer stdout (JSON) with a small tail; also include stderr.
+    let mut joined = String::new();
+    joined.push_str(&String::from_utf8_lossy(&check_out.stdout));
+    joined.push_str(&String::from_utf8_lossy(&check_out.stderr));
+    if joined.len() > 64 * 1024 {
+        joined = format!("{}[...truncated...]", &joined[joined.len() - 64 * 1024..]);
+    }
+    build_stderr.push_str(&joined);
+    println!(
+        "         {} cargo check",
+        if check_ok { "✅" } else { "❌" }
+    );
+
+    let tests_ok = if check_ok {
+        println!("      🧪 Running cargo test (JSON) in Shuttle...");
+        let test_out = run_cargo_capture_env(&temp_dir, &["test", "--message-format=json"], &envs)?;
+        let success = test_out.status.success();
+        if !success {
+            let mut tjoined = String::new();
+            tjoined.push_str(&String::from_utf8_lossy(&test_out.stdout));
+            tjoined.push_str(&String::from_utf8_lossy(&test_out.stderr));
+            if tjoined.len() > 64 * 1024 {
+                tjoined = format!("{}[...truncated...]", &tjoined[tjoined.len() - 64 * 1024..]);
+            }
+            build_stderr.push_str(&tjoined);
+        }
+        println!("         {} cargo test", if success { "✅" } else { "❌" });
+        success
+    } else {
+        println!("         ⏭️ Skipping tests (check failed)");
+        false
+    };
 
     Ok(CandidateEval {
-        check_ok: true, // Assume success in Shuttle
-        tests_ok: true, // Assume success in Shuttle
-        build_stderr: String::new(),
+        check_ok,
+        tests_ok,
+        build_stderr,
     })
 }
 
@@ -837,16 +862,6 @@ fn try_build_and_test_in_temp(cfg: &AutopatcherConfig, ps: &PatchSet) -> Result<
     apply_patchset_atomic_only(&wt_dir, ps)?;
     println!("         ✅ Patches applied");
 
-    if is_shuttle {
-        println!("      🏭 Running in Shuttle - skipping cargo validation");
-        println!("         ⚠️  Cargo checks disabled in production environment");
-        return Ok(CandidateEval {
-            check_ok: true, // Assume success in production
-            tests_ok: true, // Assume success in production
-            build_stderr: String::new(),
-        });
-    }
-
     // Per-candidate target dir to avoid parallel lock contention.
     let target_dir = wt_dir.join("target");
     let target_dir_str = target_dir.to_string_lossy();
@@ -945,26 +960,16 @@ fn apply_patchset_transactional(root: &Path, ps: &PatchSet) -> Result<()> {
         return Err(e);
     }
 
-    // Gate: check + test (skip in deployed environment)
-    // Check if we're in Shuttle environment
-    let is_shuttle = std::env::var("SHUTTLE").is_ok()
-        || std::env::var("SHUTTLE_PROJECT_ID").is_ok()
-        || std::env::var("SHUTTLE_SERVICE_NAME").is_ok();
-
-    if is_shuttle {
-        println!("🏭 Skipping cargo validation in deployed environment");
-        println!("   ⚠️  Production mode - assuming code quality checks passed during build");
-    } else {
-        if let Err(e) = run_cargo(root, &["check"]) {
-            eprintln!("❌ `cargo check` failed after apply: {e}. Rolling back…");
-            rollback_from_backups(root, &backup_dir, &plan)?;
-            return Err(anyhow!("post-apply cargo check failed"));
-        }
-        if let Err(e) = run_cargo(root, &["test"]) {
-            eprintln!("❌ `cargo test` failed after apply: {e}. Rolling back…");
-            rollback_from_backups(root, &backup_dir, &plan)?;
-            return Err(anyhow!("post-apply cargo test failed"));
-        }
+    // Gate: check + test (always run cargo validation for code quality)
+    if let Err(e) = run_cargo(root, &["check"]) {
+        eprintln!("❌ `cargo check` failed after apply: {e}. Rolling back…");
+        rollback_from_backups(root, &backup_dir, &plan)?;
+        return Err(anyhow!("post-apply cargo check failed"));
+    }
+    if let Err(e) = run_cargo(root, &["test"]) {
+        eprintln!("❌ `cargo test` failed after apply: {e}. Rolling back…");
+        rollback_from_backups(root, &backup_dir, &plan)?;
+        return Err(anyhow!("post-apply cargo test failed"));
     }
 
     // Success: cleanup backups.
