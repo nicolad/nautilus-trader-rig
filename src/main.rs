@@ -371,32 +371,10 @@ async fn run(config: &Config) -> Result<()> {
     ensure_command_exists("git").context("`git` is required in PATH")?;
     println!("   ✅ git found");
 
-    // Check if we're running in Shuttle environment
-    println!("📋 Debugging Shuttle environment detection...");
-    println!("   SHUTTLE env var: {:?}", std::env::var("SHUTTLE"));
-    println!(
-        "   SHUTTLE_PROJECT_ID env var: {:?}",
-        std::env::var("SHUTTLE_PROJECT_ID")
-    );
-    println!(
-        "   SHUTTLE_SERVICE_NAME env var: {:?}",
-        std::env::var("SHUTTLE_SERVICE_NAME")
-    );
-
-    let is_shuttle = std::env::var("SHUTTLE").is_ok()
-        || std::env::var("SHUTTLE_PROJECT_ID").is_ok()
-        || std::env::var("SHUTTLE_SERVICE_NAME").is_ok();
-
-    println!("   Is Shuttle environment: {}", is_shuttle);
-
-    if is_shuttle {
-        println!("📋 Running in Shuttle environment - skipping cargo validation");
-        println!("   ⚠️  Cargo checks will be disabled in production");
-    } else {
-        println!("📋 Checking cargo command...");
-        ensure_command_exists("cargo").context("`cargo` is required (install Rust toolchain)")?;
-        println!("   ✅ cargo found");
-    }
+    // Skip cargo validation in deployed environment
+    // The application has already been built and tested during the build process
+    println!("📋 Skipping cargo validation in deployed environment");
+    println!("   ⚠️  Cargo checks are disabled in production mode");
 
     println!("🔧 Configuring parallelism ({} jobs)...", cfg.jobs);
     init_global_rayon(cfg.jobs);

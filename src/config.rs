@@ -201,9 +201,8 @@ impl GitConfig {
     pub fn from_env() -> Self {
         Self {
             github_token: std::env::var("GITHUB_TOKEN").ok(),
-            user_name: std::env::var("GIT_USER_NAME").unwrap_or_else(|_| "nicolad".to_string()),
-            user_email: std::env::var("GIT_USER_EMAIL")
-                .unwrap_or_else(|_| "nicolai.vadim@gmail.com".to_string()),
+            user_name: "nicolad".to_string(),
+            user_email: "nicolai.vadim@gmail.com".to_string(),
             excluded_files: vec![
                 ".gitignore".to_string(),
                 "Secrets.toml".to_string(),
@@ -211,8 +210,8 @@ impl GitConfig {
                 "*.pem".to_string(),
                 "*.key".to_string(),
             ],
-            remote_url: std::env::var("GIT_REMOTE_URL").ok(),
-            target_branch: std::env::var("GIT_TARGET_BRANCH").ok(),
+            remote_url: std::env::var("https://github.com/nicolad/nautilus_trader_rig").ok(),
+            target_branch: std::env::var("main").ok(),
         }
     }
 
