@@ -31,6 +31,9 @@ use rig::{
     providers::deepseek::{self, DEEPSEEK_REASONER},
 };
 
+// Import streaming functionality - we'll add this module
+mod streaming;
+
 /// A small, conservative patch set that the model proposes.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 struct PatchSet {
@@ -76,6 +79,7 @@ enum Edit {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct PlanningInput {
     policy: String,
+    instructions: Option<String>,
     files: BTreeMap<String, String>,
     last_build_output: Option<String>,
     candidates: usize,
@@ -151,8 +155,12 @@ async fn run(cfg: Config) -> Result<()> {
             println!("      {} ({} bytes)", path, content.len());
         }
 
+        // Read instructions from INSTRUCTIONS.md if available
+        let instructions = read_instructions(&cfg.target);
+
         let input = PlanningInput {
             policy: POLICY_TEXT.to_string(),
+            instructions,
             files,
             last_build_output: last_build_output.clone(),
             candidates: cfg.candidates,
@@ -371,7 +379,28 @@ const POLICY_TEXT: &str = r#"
 Output strictly valid JSON for { "patches": PatchSet[] }.
 Use only the provided edit kinds. Avoid broad matches in search/replace.
 Prefer adding tests under `tests/` as `smoke_*` or minimal `#[cfg(test)]` modules.
+Pay attention to any instructions provided - they contain guidance for what improvements to focus on.
 "#;
+
+/// Read the INSTRUCTIONS.md file if it exists.
+fn read_instructions(target_dir: &Path) -> Option<String> {
+    let instructions_path = target_dir.join("INSTRUCTIONS.md");
+    if instructions_path.exists() {
+        match fs::read_to_string(&instructions_path) {
+            Ok(content) => {
+                println!("📋 Read instructions from {}", instructions_path.display());
+                Some(content.trim().to_string())
+            }
+            Err(e) => {
+                println!("⚠️  Failed to read {}: {}", instructions_path.display(), e);
+                None
+            }
+        }
+    } else {
+        println!("📋 No INSTRUCTIONS.md found");
+        None
+    }
+}
 
 /// Candidate result from temp evaluation.
 #[derive(Default)]
