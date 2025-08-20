@@ -1,1 +1,1 @@
-need to find low-hanging fruit for quick wins <https://github.com/nautechsystems/nautilus_trader>
+find bugs and fix them in <https://github.com/nautechsystems/nautilus_trader>

@@ -60,11 +60,11 @@ impl DeepSeekClient {
     pub async fn stream_prompt(&self, prompt: &str) -> Result<String> {
         println!("🤖 DeepSeek is thinking...");
         std::io::Write::flush(&mut std::io::stdout())?;
-        
+
         // For now, just use the regular prompt method
         // TODO: Implement proper streaming when rig API supports it
         let response = self.prompt(prompt).await?;
-        
+
         println!("✅ Response received");
         Ok(response)
     }
@@ -369,6 +369,10 @@ Input:
             git_commit(&cfg.target, &commit_msg)?;
             println!("🎉 Committed successfully!");
             println!("   💾 Commit message: {}", ps.title.trim());
+
+            println!("📤 Pushing changes...");
+            git_push(&cfg.target)?;
+            println!("🚀 Pushed successfully!");
 
             last_build_output = None;
         } else {
@@ -842,6 +846,18 @@ fn git_commit(root: &Path, msg: &str) -> Result<()> {
         .success();
     if !ok {
         return Err(anyhow!("git commit failed"));
+    }
+    Ok(())
+}
+
+fn git_push(root: &Path) -> Result<()> {
+    let ok = Command::new("git")
+        .args(["push"])
+        .current_dir(root)
+        .status()?
+        .success();
+    if !ok {
+        return Err(anyhow!("git push failed"));
     }
     Ok(())
 }
