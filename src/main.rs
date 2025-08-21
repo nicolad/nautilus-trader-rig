@@ -42,6 +42,8 @@ use walkdir::WalkDir;
 
 mod config;
 mod logging;
+mod improve;
+mod pr;
 
 use config::{AutopatcherConfig, Config, GitConfig};
 use logging::{FileLogger, LoggingConfig, OperationLogger};
