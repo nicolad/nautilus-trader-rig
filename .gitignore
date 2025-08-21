@@ -4,6 +4,9 @@
 # Local clone of external repo
 /nautilus_trader/
 
+# Autopatcher backup files
+.autopatch_backups/
+
 # Logs
 /logs/
 

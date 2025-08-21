@@ -769,12 +769,17 @@ Input:
                     if eval.check_ok && eval.tests_ok {
                         successful_candidates += 1;
                     }
-                    let test_status = if eval.tests_ok { "✅" } else { "❌" };
                     println!(
                         "   Candidate {}: {} check, {} tests",
                         i + 1,
                         check_status,
                         test_status
+                    );
+                    log::debug!(
+                        "Candidate {} evaluation: check={}, tests={}",
+                        i + 1,
+                        eval.check_ok,
+                        eval.tests_ok
                     );
                     if !eval.build_stderr.is_empty() && (!eval.check_ok || !eval.tests_ok) {
                         println!(
@@ -785,13 +790,22 @@ Input:
                                 .collect::<Vec<_>>()
                                 .join(" | ")
                         );
+                        log::debug!(
+                            "Candidate {} error: {}",
+                            i + 1,
+                            eval.build_stderr.lines().next().unwrap_or("No error message")
+                        );
                     }
                 }
                 Err(e) => {
                     println!("   Candidate {}: ❌ evaluation failed: {}", i + 1, e);
+                    log::warn!("Candidate {} evaluation failed: {}", i + 1, e);
                 }
             }
         }
+        
+        println!("📊 Summary: {}/{} candidates passed evaluation", successful_candidates, parsed.len());
+        log::info!("Evaluation summary: {}/{} candidates passed", successful_candidates, parsed.len());
 
         // Winner = first candidate where check & tests both pass.
         if let Some((i, Ok(_ce))) = evals.into_iter().find(|(_, r)| {
@@ -804,28 +818,55 @@ Input:
             let ps = &parsed[i];
             println!("🏆 WINNER: Candidate {} - {}", i + 1, ps.title);
             println!("   📋 Rationale: {}", ps.rationale);
+            log::info!("Winner selected: Candidate {} - {}", i + 1, ps.title);
 
             println!("🔄 Applying patch to real repository...");
+            println!("📊 Status: Applying {} edits to {}", ps.edits.len(), cfg.target.display());
+            log::info!("Applying patch with {} edits to repository", ps.edits.len());
+            
+            let apply_start = std::time::Instant::now();
             apply_patchset_transactional(&cfg.target, ps)
                 .context("Failed to apply patchset transactionally to real repo")?;
-            println!("   ✅ Patch applied successfully");
+            let apply_duration = apply_start.elapsed();
+            
+            println!("   ✅ Patch applied successfully in {:?}", apply_duration);
+            log::info!("Patch applied successfully in {:?}", apply_duration);
 
             println!("📝 Committing changes...");
+            println!("📊 Status: Preparing git commit...");
+            log::info!("Preparing git commit for applied changes");
+            
             ensure_git_repo(&cfg.target, &config.git)?;
             git_add_all_filtered(&cfg.target, &config.git)?;
             let commit_msg = format!("{} [autopatch]\n\n{}", ps.title.trim(), ps.rationale.trim());
+            
+            println!("📊 Status: Committing with message: {}", ps.title.trim());
             git_commit_with_config(&cfg.target, &commit_msg, &config.git)?;
             println!("🎉 Committed successfully!");
             println!("   💾 Commit message: {}", ps.title.trim());
+            log::info!("Git commit successful: {}", ps.title.trim());
 
             println!("📤 Pushing changes...");
+            println!("📊 Status: Pushing to remote repository...");
+            log::info!("Pushing changes to remote repository");
+            
+            let push_start = std::time::Instant::now();
             git_push(&cfg.target)?;
-            println!("🚀 Pushed successfully!");
+            let push_duration = push_start.elapsed();
+            
+            println!("🚀 Pushed successfully in {:?}!", push_duration);
+            log::info!("Push completed successfully in {:?}", push_duration);
 
             last_build_output = None;
+            
+            // Iteration completed successfully
+            let iter_duration = chrono::Utc::now() - iter_start_time;
+            println!("✅ Iteration {} completed successfully in {}ms", iter, iter_duration.num_milliseconds());
+            log::info!("Iteration {} completed successfully in {}ms", iter, iter_duration.num_milliseconds());
         } else {
             println!("💔 No candidate passed both build and tests.");
             println!("📝 Capturing build output for next iteration...");
+            log::warn!("No candidates passed evaluation in iteration {}", iter);
 
             // Capture a failing build log to feed back next time (best-effort on first candidate).
             last_build_output = Some(
@@ -838,13 +879,19 @@ Input:
 
             if let Some(ref output) = last_build_output {
                 println!("   📋 Captured {} chars of build output", output.len());
+                log::info!("Captured {} chars of build output for next iteration", output.len());
             }
+            
+            let iter_duration = chrono::Utc::now() - iter_start_time;
+            println!("❌ Iteration {} failed in {}ms - stopping", iter, iter_duration.num_milliseconds());
+            log::warn!("Iteration {} failed in {}ms", iter, iter_duration.num_milliseconds());
             break;
         }
     }
-
-    println!("\n🏁 Autopatcher completed!");
+    
+    println!("🏁 Autopatcher run completed");
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    log::info!("Autopatcher run completed");
     Ok(())
 }
 
@@ -2010,7 +2057,7 @@ async fn create_pull_request(
     // 5. Create a PR via GitHub API
     
     println!("� Pull request (placeholder) created successfully!");
-    Ok(())
+.autopatch_backups/    Ok(())
 }
 
 /// Determine what outcome to take based on analysis
