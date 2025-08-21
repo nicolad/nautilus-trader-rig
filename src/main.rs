@@ -41,11 +41,12 @@ use tokio::time;
 use walkdir::WalkDir;
 
 mod config;
-mod logging;
 mod improve;
+mod logging;
 mod pr;
 
 use config::{AutopatcherConfig, Config, GitConfig};
+use improve::Improver;
 use logging::{FileLogger, LoggingConfig, OperationLogger};
 
 /// DeepSeek client using rig framework
@@ -2166,16 +2167,173 @@ Generate a specific, implementable improvement now.
 }
 
 /// Apply self-improvement to the autopatcher's own codebase
+/// Enhanced self-improvement using the improve.rs module
+async fn enhance_self_improvement_with_logging(
+    client: &DeepSeekClient,
+    config: &Config,
+) -> Result<Option<AutopatcherOutcome>> {
+    let file_logger = FileLogger::new()?;
+    let mut improver = Improver::new(client.clone(), file_logger.clone());
+
+    file_logger
+        .operation_start(
+            "ENHANCED_SELF_IMPROVEMENT",
+            "Starting enhanced self-improvement analysis",
+        )
+        .await?;
+
+    // Load recent commits to avoid duplicates
+    if let Err(e) = improver.load_recent_commits().await {
+        file_logger
+            .warn(&format!("Could not load recent commits: {}", e))
+            .await?;
+    }
+
+    // Analyze the current codebase for improvements
+    let current_dir = std::env::current_dir()?;
+    let rust_files = find_rust_files(&current_dir)?;
+
+    let mut all_analyses = Vec::new();
+    for file_path in rust_files.iter().take(10) {
+        // Limit to avoid too many API calls
+        let relative_path = file_path.strip_prefix(&current_dir).unwrap_or(file_path);
+        if let Ok(content) = std::fs::read_to_string(file_path) {
+            if content.len() < 10000 {
+                // Only analyze reasonably sized files
+                match improver
+                    .analyze_code(&relative_path.to_string_lossy(), &content)
+                    .await
+                {
+                    Ok(analysis) => all_analyses.push(analysis),
+                    Err(e) => {
+                        file_logger
+                            .warn(&format!(
+                                "Failed to analyze {}: {}",
+                                relative_path.display(),
+                                e
+                            ))
+                            .await?
+                    }
+                }
+            }
+        }
+    }
+
+    if all_analyses.is_empty() {
+        file_logger
+            .info("No code analysis results - no improvements suggested")
+            .await?;
+        file_logger
+            .operation_complete("ENHANCED_SELF_IMPROVEMENT", 0, false)
+            .await?;
+        return Ok(None);
+    }
+
+    // Create improvement plan
+    let improvement_plan = improver.create_improvement_plan(&all_analyses).await?;
+
+    if improvement_plan.total_issues == 0 {
+        file_logger
+            .info("No issues found - codebase is in good shape!")
+            .await?;
+        file_logger
+            .operation_complete("ENHANCED_SELF_IMPROVEMENT", 0, true)
+            .await?;
+        return Ok(None);
+    }
+
+    // Generate a commit message based on the most critical issues
+    let high_priority_issues: Vec<_> = improvement_plan.priorities.iter().take(3).collect();
+
+    let mut commit_title = "Improve code quality".to_string();
+    if let Some(first_issue) = high_priority_issues.first() {
+        commit_title = match first_issue.issue.category {
+            improve::IssueCategory::Performance => "Optimize performance bottlenecks".to_string(),
+            improve::IssueCategory::ErrorHandling => "Enhance error handling".to_string(),
+            improve::IssueCategory::Architecture => "Refactor architecture patterns".to_string(),
+            improve::IssueCategory::Testing => "Improve test coverage".to_string(),
+            improve::IssueCategory::Documentation => "Update documentation".to_string(),
+            improve::IssueCategory::Naming => "Fix naming conventions".to_string(),
+        };
+    }
+
+    // Ensure unique commit message
+    let unique_commit = improver
+        .ensure_unique_commit(&format!("{} [self-improve]", commit_title))
+        .await?;
+
+    // Create a summary of improvements
+    let rationale = format!(
+        "Self-improvement analysis found {} issues across {} files (avg score: {:.1}). Priority improvements:\n{}",
+        improvement_plan.total_issues,
+        improvement_plan.total_files,
+        improvement_plan.average_score,
+        high_priority_issues.iter()
+            .map(|item| format!("- {}: {}", item.file, item.issue.description))
+            .collect::<Vec<_>>()
+            .join("\n")
+    );
+
+    file_logger
+        .info(&format!("Generated improvement plan: {}", unique_commit))
+        .await?;
+    file_logger
+        .operation_complete("ENHANCED_SELF_IMPROVEMENT", 0, true)
+        .await?;
+
+    // For now, return None since we don't have actual code fixes yet
+    // In the future, this could generate actual patches based on the analysis
+    Ok(None)
+}
+
+/// Find Rust files in the project
+fn find_rust_files(dir: &std::path::Path) -> Result<Vec<std::path::PathBuf>> {
+    let mut rust_files = Vec::new();
+
+    for entry in WalkDir::new(dir)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .filter(|e| e.file_type().is_file())
+        .filter(|e| e.path().extension().and_then(|s| s.to_str()) == Some("rs"))
+        .filter(|e| !e.path().to_string_lossy().contains("target/"))
+    // Skip build artifacts
+    {
+        rust_files.push(entry.path().to_path_buf());
+    }
+
+    Ok(rust_files)
+}
+
 async fn apply_self_improvement(patch: &PatchSet, config: &Config) -> Result<()> {
-    println!("🔧 Applying self-improvement patch: {}", patch.title);
+    // Initialize logging for self-improvement
+    let file_logger = FileLogger::new()?;
+
+    file_logger
+        .operation_start(
+            "SELF_IMPROVEMENT",
+            &format!("Applying patch: {}", patch.title),
+        )
+        .await?;
+    file_logger
+        .info(&format!(
+            "🔧 Applying self-improvement patch: {}",
+            patch.title
+        ))
+        .await?;
 
     let current_dir = std::env::current_dir()?;
 
-    // Debug: Print the patch details before applying
-    println!("📝 Patch details:");
-    println!("   Title: {}", patch.title);
-    println!("   Rationale: {}", patch.rationale);
-    println!("   Number of edits: {}", patch.edits.len());
+    // Debug: Log the patch details before applying
+    file_logger.debug(&format!("📝 Patch details:")).await?;
+    file_logger
+        .debug(&format!("   Title: {}", patch.title))
+        .await?;
+    file_logger
+        .debug(&format!("   Rationale: {}", patch.rationale))
+        .await?;
+    file_logger
+        .debug(&format!("   Number of edits: {}", patch.edits.len()))
+        .await?;
 
     for (i, edit) in patch.edits.iter().enumerate() {
         match edit {
@@ -2185,20 +2343,28 @@ async fn apply_self_improvement(patch: &PatchSet, config: &Config) -> Result<()>
                 replace,
                 ..
             } => {
-                println!("   Edit {}: SearchReplace in {}", i + 1, path);
-                println!(
-                    "     Search (first 100 chars): {}",
-                    &search.chars().take(100).collect::<String>()
-                );
-                println!(
-                    "     Replace (first 100 chars): {}",
-                    &replace.chars().take(100).collect::<String>()
-                );
+                file_logger
+                    .debug(&format!("   Edit {}: SearchReplace in {}", i + 1, path))
+                    .await?;
+                file_logger
+                    .debug(&format!(
+                        "     Search (first 100 chars): {}",
+                        &search.chars().take(100).collect::<String>()
+                    ))
+                    .await?;
+                file_logger
+                    .debug(&format!(
+                        "     Replace (first 100 chars): {}",
+                        &replace.chars().take(100).collect::<String>()
+                    ))
+                    .await?;
 
                 // Verify file exists
                 let file_path = current_dir.join(path);
                 if !file_path.exists() {
-                    return Err(anyhow!("File does not exist: {}", path));
+                    let error_msg = format!("File does not exist: {}", path);
+                    file_logger.error(&error_msg).await?;
+                    return Err(anyhow!(error_msg));
                 }
 
                 // Verify search text exists in file
@@ -2207,19 +2373,34 @@ async fn apply_self_improvement(patch: &PatchSet, config: &Config) -> Result<()>
                     .with_context(|| format!("Failed to read file: {}", path))?;
 
                 if !file_content.contains(search) {
-                    println!("❌ Search text not found in file {}", path);
-                    println!("   File size: {} chars", file_content.len());
-                    println!("   Search text: {}", search);
+                    let error_msg = format!("Search text not found in file {}", path);
+                    file_logger.error(&error_msg).await?;
+                    file_logger
+                        .debug(&format!("   File size: {} chars", file_content.len()))
+                        .await?;
+                    file_logger
+                        .debug(&format!("   Search text: {}", search))
+                        .await?;
                     return Err(anyhow!("Search text not found in file: {}", path));
                 }
             }
             Edit::InsertAfter { path, anchor, .. } => {
-                println!("   Edit {}: InsertAfter in {} after anchor", i + 1, path);
-                println!("     Anchor: {}", anchor);
+                file_logger
+                    .debug(&format!(
+                        "   Edit {}: InsertAfter in {} after anchor",
+                        i + 1,
+                        path
+                    ))
+                    .await?;
+                file_logger
+                    .debug(&format!("     Anchor: {}", anchor))
+                    .await?;
 
                 let file_path = current_dir.join(path);
                 if !file_path.exists() {
-                    return Err(anyhow!("File does not exist: {}", path));
+                    let error_msg = format!("File does not exist: {}", path);
+                    file_logger.error(&error_msg).await?;
+                    return Err(anyhow!(error_msg));
                 }
 
                 let file_content = tokio::fs::read_to_string(&file_path)
@@ -2227,17 +2408,28 @@ async fn apply_self_improvement(patch: &PatchSet, config: &Config) -> Result<()>
                     .with_context(|| format!("Failed to read file: {}", path))?;
 
                 if !file_content.contains(anchor) {
-                    println!("❌ Anchor text not found in file {}", path);
+                    let error_msg = format!("Anchor text not found in file {}", path);
+                    file_logger.error(&error_msg).await?;
                     return Err(anyhow!("Anchor text not found in file: {}", path));
                 }
             }
             Edit::InsertBefore { path, anchor, .. } => {
-                println!("   Edit {}: InsertBefore in {} before anchor", i + 1, path);
-                println!("     Anchor: {}", anchor);
+                file_logger
+                    .debug(&format!(
+                        "   Edit {}: InsertBefore in {} before anchor",
+                        i + 1,
+                        path
+                    ))
+                    .await?;
+                file_logger
+                    .debug(&format!("     Anchor: {}", anchor))
+                    .await?;
 
                 let file_path = current_dir.join(path);
                 if !file_path.exists() {
-                    return Err(anyhow!("File does not exist: {}", path));
+                    let error_msg = format!("File does not exist: {}", path);
+                    file_logger.error(&error_msg).await?;
+                    return Err(anyhow!(error_msg));
                 }
 
                 let file_content = tokio::fs::read_to_string(&file_path)
@@ -2245,27 +2437,37 @@ async fn apply_self_improvement(patch: &PatchSet, config: &Config) -> Result<()>
                     .with_context(|| format!("Failed to read file: {}", path))?;
 
                 if !file_content.contains(anchor) {
-                    println!("❌ Anchor text not found in file {}", path);
+                    let error_msg = format!("Anchor text not found in file {}", path);
+                    file_logger.error(&error_msg).await?;
                     return Err(anyhow!("Anchor text not found in file: {}", path));
                 }
             }
             Edit::ReplaceFile { path, content } => {
-                println!("   Edit {}: ReplaceFile {}", i + 1, path);
-                println!("     New content length: {} chars", content.len());
+                file_logger
+                    .debug(&format!("   Edit {}: ReplaceFile {}", i + 1, path))
+                    .await?;
+                file_logger
+                    .debug(&format!("     New content length: {} chars", content.len()))
+                    .await?;
 
                 let file_path = current_dir.join(path);
                 // File doesn't need to exist for ReplaceFile
-                println!("     Target path: {}", file_path.display());
+                file_logger
+                    .debug(&format!("     Target path: {}", file_path.display()))
+                    .await?;
             }
         }
     }
 
     // Apply the patch to our own codebase
+    file_logger.info("🔧 Applying patch to codebase...").await?;
     apply_patchset_transactional(&current_dir, patch)
         .context("Failed to apply self-improvement patch")?;
 
     // Test that our changes compile
-    println!("🧪 Testing that self-improvements compile...");
+    file_logger
+        .info("🧪 Testing that self-improvements compile...")
+        .await?;
     let output = Command::new("cargo")
         .arg("check")
         .current_dir(&current_dir)
@@ -2275,9 +2477,9 @@ async fn apply_self_improvement(patch: &PatchSet, config: &Config) -> Result<()>
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         let stdout = String::from_utf8_lossy(&output.stdout);
-        println!("❌ Compilation failed:");
-        println!("STDOUT: {}", stdout);
-        println!("STDERR: {}", stderr);
+        file_logger.error("❌ Compilation failed:").await?;
+        file_logger.error(&format!("STDOUT: {}", stdout)).await?;
+        file_logger.error(&format!("STDERR: {}", stderr)).await?;
         return Err(anyhow!(
             "Self-improvement patch breaks compilation: {}",
             stderr
@@ -2285,7 +2487,9 @@ async fn apply_self_improvement(patch: &PatchSet, config: &Config) -> Result<()>
     }
 
     // Commit and push the self-improvement
-    println!("📝 Committing self-improvement...");
+    file_logger
+        .info("📝 Committing self-improvement...")
+        .await?;
     ensure_git_repo(&current_dir, &config.git)?;
     git_add_all_filtered(&current_dir, &config.git)?;
 
@@ -2295,12 +2499,42 @@ async fn apply_self_improvement(patch: &PatchSet, config: &Config) -> Result<()>
         patch.rationale.trim()
     );
 
-    git_commit_with_config(&current_dir, &commit_msg, &config.git)?;
+    file_logger
+        .debug(&format!("Commit message: {}", commit_msg))
+        .await?;
 
-    println!("📤 Pushing self-improvement...");
-    git_push(&current_dir)?;
+    match git_commit_with_config(&current_dir, &commit_msg, &config.git) {
+        Ok(_) => {
+            file_logger.info("✅ Commit successful").await?;
+        }
+        Err(e) => {
+            file_logger
+                .error(&format!("❌ Git commit failed: {}", e))
+                .await?;
+            return Err(anyhow!("git commit failed: {}", e));
+        }
+    }
 
-    println!("🎉 Self-improvement applied and pushed successfully!");
+    file_logger.info("📤 Pushing self-improvement...").await?;
+    match git_push(&current_dir) {
+        Ok(_) => {
+            file_logger.info("✅ Push successful").await?;
+        }
+        Err(e) => {
+            file_logger
+                .warn(&format!("⚠️ Push failed (continuing): {}", e))
+                .await?;
+        }
+    }
+
+    file_logger
+        .operation_complete("SELF_IMPROVEMENT", 0, true)
+        .await?;
+    file_logger
+        .info("🎉 Self-improvement applied successfully!")
+        .await?;
+
+    println!("🎉 Self-improvement applied and logged successfully!");
     Ok(())
 }
 
