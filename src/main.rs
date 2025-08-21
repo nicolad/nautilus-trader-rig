@@ -279,18 +279,38 @@ async fn main() -> Result<()> {
 
     // Create tokio interval for the specified minutes
     let mut interval = time::interval(Duration::from_secs(interval_minutes * 60));
+    let mut run_count = 0;
 
     // Run first execution immediately
     println!("🎯 Running first execution immediately...");
     log::info!("Starting first execution immediately");
+    run_count += 1;
+    println!("🔢 Execution #{}: Starting autopatcher run", run_count);
+    log::info!("Execution #{}: Starting autopatcher run", run_count);
     run_autopatcher_job().await;
+    println!("✅ Execution #{}: Completed", run_count);
+    log::info!("Execution #{}: Completed", run_count);
 
     // Then run on schedule
     loop {
+        println!("⏰ Waiting for next scheduled run in {} minutes...", interval_minutes);
+        log::info!("Waiting for next scheduled run in {} minutes", interval_minutes);
+        
+        let next_run_time = chrono::Utc::now() + chrono::Duration::minutes(interval_minutes as i64);
+        println!("⏰ Next run scheduled for: {}", next_run_time.format("%Y-%m-%d %H:%M:%S UTC"));
+        log::info!("Next run scheduled for: {}", next_run_time.format("%Y-%m-%d %H:%M:%S UTC"));
+        
         interval.tick().await;
-        println!("⏰ Timer tick - running autopatcher job...");
-        log::info!("Timer tick - running scheduled autopatcher job");
+        run_count += 1;
+        println!("🔢 Execution #{}: Timer triggered - running autopatcher job", run_count);
+        log::info!("Execution #{}: Timer triggered - running autopatcher job", run_count);
+        
+        let start_time = chrono::Utc::now();
         run_autopatcher_job().await;
+        let duration = chrono::Utc::now() - start_time;
+        
+        println!("✅ Execution #{}: Completed in {}ms", run_count, duration.num_milliseconds());
+        log::info!("Execution #{}: Completed in {}ms", run_count, duration.num_milliseconds());
     }
 }
 
@@ -462,24 +482,35 @@ async fn run(config: &Config) -> Result<()> {
     log::info!("DeepSeek client initialized successfully");
 
     let mut last_build_output: Option<String> = None;
+    
+    println!("🚀 Starting main autopatcher iteration loop");
+    log::info!("Starting main autopatcher iteration loop with {} max iterations", cfg.max_iterations);
 
     // Check for special outcomes (self-improvement or PR creation) every iteration
     for iter in 1..=cfg.max_iterations {
+        let iter_start_time = chrono::Utc::now();
         println!("\n🔄 === Iteration {iter}/{} ===", cfg.max_iterations);
-        log::info!("Starting iteration {}/{}", iter, cfg.max_iterations);
+        println!("⏰ Started at: {}", iter_start_time.format("%H:%M:%S UTC"));
+        log::info!("Starting iteration {}/{} at {}", iter, cfg.max_iterations, iter_start_time.format("%Y-%m-%d %H:%M:%S UTC"));
 
         // Check for special outcomes based on configuration
         if iter % cfg.outcome_check_frequency == 0 {
             println!("🎯 Checking for autopatcher outcomes...");
+            println!("📊 Status: Outcome check frequency reached (every {} iterations)", cfg.outcome_check_frequency);
             log::info!("Checking for autopatcher outcomes (iteration {} is divisible by {})", iter, cfg.outcome_check_frequency);
+            
+            println!("🤖 Status: Calling AI to determine outcomes...");
+            log::info!("Calling AI to determine autopatcher outcomes");
 
             if let Some(outcome) = determine_outcome(&client, config).await? {
+                println!("✅ Outcome determined by AI");
                 log::info!("Autopatcher outcome determined: {:?}", outcome);
                 match outcome {
                     AutopatcherOutcome::SelfImprove { reason, patch } => {
                         if cfg.enable_self_improvement {
                             println!("🔧 Self-improvement triggered: {}", reason);
                             println!("   📋 Patch: {}", patch.title);
+                            println!("   🔧 Status: Applying self-improvement patch...");
                             log::info!("Self-improvement triggered: {} - Patch: {}", reason, patch.title);
                             
                             // Apply self-improvement
@@ -529,23 +560,39 @@ async fn run(config: &Config) -> Result<()> {
                 }
             } else {
                 println!("   ✅ No special outcomes needed at this time");
+                log::info!("No special outcomes determined for iteration {}", iter);
             }
+        } else {
+            println!("� Status: Skipping outcome check (not at frequency interval)");
+            log::debug!("Skipping outcome check - iteration {} not divisible by {}", iter, cfg.outcome_check_frequency);
         }
 
-        println!("📸 Taking codebase snapshot...");
-
+        println!("�📸 Taking codebase snapshot...");
+        println!("📊 Status: Analyzing target directory: {}", cfg.target.display());
+        log::info!("Taking codebase snapshot from {}", cfg.target.display());
+        
+        let snapshot_start = std::time::Instant::now();
         let files = snapshot_codebase_smart(
             &cfg.target,
             cfg.snapshot_max_files,
             cfg.snapshot_max_bytes,
             last_build_output.as_deref(),
         )?;
-        println!("   📝 Captured {} files", files.len());
+        let snapshot_duration = snapshot_start.elapsed();
+        
+        println!("   📝 Captured {} files in {:?}", files.len(), snapshot_duration);
+        log::info!("Snapshot completed: {} files in {:?}", files.len(), snapshot_duration);
+        
+        let total_bytes: usize = files.values().map(|content| content.len()).sum();
+        println!("   📊 Total snapshot size: {} bytes ({:.1} KB)", total_bytes, total_bytes as f64 / 1024.0);
+        log::info!("Total snapshot size: {} bytes", total_bytes);
+        
         for (path, content) in &files {
             println!("      {} ({} bytes)", path, content.len());
         }
 
         // Read instructions from INSTRUCTIONS.md if available
+        println!("📋 Status: Reading instructions from INSTRUCTIONS.md...");
         let instructions = read_instructions(&cfg.target);
 
         let input = PlanningInput {
@@ -561,11 +608,21 @@ async fn run(config: &Config) -> Result<()> {
                 "📋 Including previous build output ({} chars)",
                 build_output.len()
             );
+            log::info!("Including previous build output ({} chars) in analysis", build_output.len());
+        } else {
+            println!("📋 No previous build output to include");
+            log::info!("No previous build output available for analysis");
         }
 
         println!("🧠 Requesting patch proposals from DeepSeek...");
+        println!("📊 Status: Preparing AI prompt with {} candidates requested", cfg.candidates);
+        log::info!("Requesting {} patch candidates from DeepSeek AI", cfg.candidates);
+        
         let plan_json = serde_json::to_string_pretty(&input)?;
         println!("   📤 Sending prompt ({} chars)", plan_json.len());
+        log::info!("Sending prompt to AI ({} chars)", plan_json.len());
+        
+        let ai_start_time = std::time::Instant::now();
         let prompt = format!(
             r#"
 Return **ONLY** valid JSON of the form:
@@ -593,19 +650,31 @@ Input:
             plan = plan_json
         );
 
+        println!("⏳ Status: Waiting for AI response...");
         let raw = client.prompt_with_context(&prompt, "Code-Patch-Generator").await.context("LLM call failed")?;
-        println!("   📥 Received response ({} chars)", raw.len());
+        let ai_duration = ai_start_time.elapsed();
+        
+        println!("   📥 Received response ({} chars) in {:?}", raw.len(), ai_duration);
+        log::info!("Received AI response ({} chars) in {:?}", raw.len(), ai_duration);
 
         println!("🔍 Parsing patch proposals...");
+        println!("📊 Status: Extracting JSON from AI response...");
+        log::info!("Parsing patch proposals from AI response");
+        
         let parsed = parse_patches(&raw)?;
         if parsed.is_empty() {
-            println!("❌ Model returned no patches; stopping.");
+            println!("❌ Model returned no patches; stopping iteration");
+            log::warn!("AI returned no patches for iteration {}", iter);
             break;
         }
 
         println!("   ✅ Found {} patch proposals:", parsed.len());
+        log::info!("Successfully parsed {} patch proposals", parsed.len());
+        
         for (i, ps) in parsed.iter().enumerate() {
             println!("      {} - {} ({} edits)", i + 1, ps.title, ps.edits.len());
+            log::debug!("Patch {}: {} with {} edits", i + 1, ps.title, ps.edits.len());
+            
             for edit in &ps.edits {
                 match edit {
                     Edit::ReplaceFile { path, content } => {
@@ -660,25 +729,46 @@ Input:
             "🔧 Evaluating candidates in parallel ({} jobs)...",
             cfg.jobs
         );
+        println!("📊 Status: Configuring thread pool for parallel evaluation");
+        log::info!("Starting parallel evaluation of {} candidates using {} jobs", parsed.len(), cfg.jobs);
+        
         rayon::ThreadPoolBuilder::new()
             .num_threads(cfg.jobs)
             .build_global()
             .ok();
 
+        let eval_start_time = std::time::Instant::now();
+        println!("⏳ Status: Running parallel patch evaluation...");
+        
         let evals: Vec<_> = parsed
             .par_iter()
             .enumerate()
             .map(|(i, ps)| {
                 println!("   🚀 Starting evaluation of candidate {}", i + 1);
-                (i, try_build_and_test_in_temp(&cfg, ps))
+                log::debug!("Starting evaluation of candidate {}: {}", i + 1, ps.title);
+                let candidate_start = std::time::Instant::now();
+                let result = try_build_and_test_in_temp(&cfg, ps);
+                let candidate_duration = candidate_start.elapsed();
+                println!("   ✅ Completed evaluation of candidate {} in {:?}", i + 1, candidate_duration);
+                log::debug!("Completed evaluation of candidate {} in {:?}", i + 1, candidate_duration);
+                (i, result)
             })
             .collect();
 
+        let eval_duration = eval_start_time.elapsed();
+        println!("📊 Evaluation completed in {:?}", eval_duration);
+        log::info!("Parallel evaluation completed in {:?}", eval_duration);
+
         println!("📊 Evaluation results:");
+        let mut successful_candidates = 0;
         for (i, result) in &evals {
             match result {
                 Ok(eval) => {
                     let check_status = if eval.check_ok { "✅" } else { "❌" };
+                    let test_status = if eval.tests_ok { "✅" } else { "❌" };
+                    if eval.check_ok && eval.tests_ok {
+                        successful_candidates += 1;
+                    }
                     let test_status = if eval.tests_ok { "✅" } else { "❌" };
                     println!(
                         "   Candidate {}: {} check, {} tests",
@@ -1843,7 +1933,7 @@ If no significant improvements are needed, respond with: {{"no_improvements": tr
             rationale: "File I/O operations in self-analysis are currently synchronous and could benefit from async reading for better performance, especially when analyzing multiple files.".to_string(),
             edits: vec![Edit::SearchReplace {
                 path: "src/main.rs".to_string(),
-                search: "        if let Ok(content) = fs::read_to_string(&file_path) {".to_string(),
+                search: "        if let Ok(content) = tokio::fs::read_to_string(&file_path).await {".to_string(),
                 replace: "        if let Ok(content) = tokio::fs::read_to_string(&file_path).await {".to_string(),
                 occurrences: Some(1),
             }],
