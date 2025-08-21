@@ -24,6 +24,8 @@ rmcp = { version = "0.6", features = ["client", "transport-child-process"] }
 schemars = "1.0"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+octocrab = "0.40"
+base64 = "0.22"
 tempfile = "3.8"
 tokio = { version = "1", features = ["full"] }
 tracing = "0.1"

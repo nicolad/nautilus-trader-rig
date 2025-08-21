@@ -59,6 +59,12 @@ pub struct AutopatcherConfig {
     pub snapshot_max_files: usize,
     /// Maximum bytes per file
     pub snapshot_max_bytes: usize,
+    /// Enable self-improvement checks
+    pub enable_self_improvement: bool,
+    /// Enable automatic PR creation
+    pub enable_auto_pr: bool,
+    /// Frequency of outcome checks (every N iterations)
+    pub outcome_check_frequency: usize,
 }
 
 impl Default for AutopatcherConfig {
@@ -74,6 +80,9 @@ impl Default for AutopatcherConfig {
             jobs: 3,
             snapshot_max_files: 40,
             snapshot_max_bytes: 8_192,
+            enable_self_improvement: true,
+            enable_auto_pr: true,
+            outcome_check_frequency: 1, // Check every iteration
         }
     }
 }
@@ -96,6 +105,79 @@ impl AutopatcherConfig {
 
         if self.max_iterations == 0 {
             return Err("max_iterations must be greater than 0".to_string());
+        }
+
+        if self.outcome_check_frequency == 0 {
+            return Err("outcome_check_frequency must be greater than 0".to_string());
+        }
+
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GitHubConfig {
+    /// GitHub personal access token
+    pub token: Option<String>,
+    /// Target repository URL (e.g., "https://github.com/nicolad/nautilus_trader")
+    pub target_repo_url: String,
+    /// Whether to enable self-improvement
+    pub enable_self_improvement: bool,
+    /// Whether to enable automatic PR creation
+    pub enable_auto_pr: bool,
+    /// How often to check for self-improvements (every N iterations)
+    pub self_improvement_frequency: usize,
+}
+
+impl Default for GitHubConfig {
+    fn default() -> Self {
+        Self {
+            token: None,
+            target_repo_url: "https://github.com/nicolad/nautilus_trader".to_string(),
+            enable_self_improvement: true,
+            enable_auto_pr: true,
+            self_improvement_frequency: 5,
+        }
+    }
+}
+
+impl GitHubConfig {
+    /// Load from environment variables
+    pub fn from_env() -> Self {
+        Self {
+            token: std::env::var("GITHUB_TOKEN").ok(),
+            target_repo_url: std::env::var("TARGET_REPO_URL")
+                .unwrap_or_else(|_| "https://github.com/nicolad/nautilus_trader".to_string()),
+            enable_self_improvement: std::env::var("ENABLE_SELF_IMPROVEMENT")
+                .map(|v| v.to_lowercase() == "true")
+                .unwrap_or(true),
+            enable_auto_pr: std::env::var("ENABLE_AUTO_PR")
+                .map(|v| v.to_lowercase() == "true")
+                .unwrap_or(true),
+            self_improvement_frequency: std::env::var("SELF_IMPROVEMENT_FREQUENCY")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(5),
+        }
+    }
+
+    /// Validate the GitHub configuration
+    pub fn validate(&self) -> Result<(), String> {
+        if self.enable_auto_pr || self.enable_self_improvement {
+            if self.token.is_none() {
+                return Err(
+                    "GITHUB_TOKEN is required when self-improvement or auto-PR is enabled"
+                        .to_string(),
+                );
+            }
+        }
+
+        if self.target_repo_url.is_empty() {
+            return Err("target_repo_url cannot be empty".to_string());
+        }
+
+        if self.self_improvement_frequency == 0 {
+            return Err("self_improvement_frequency must be greater than 0".to_string());
         }
 
         Ok(())
@@ -260,6 +342,7 @@ pub struct Config {
     pub mcp: MCPConfig,
     pub cron: CronConfig,
     pub git: GitConfig,
+    pub github: GitHubConfig,
 }
 
 impl Default for Config {
@@ -269,6 +352,7 @@ impl Default for Config {
             mcp: MCPConfig::default(),
             cron: CronConfig::default(),
             git: GitConfig::default(),
+            github: GitHubConfig::default(),
         }
     }
 }
@@ -281,6 +365,7 @@ impl Config {
             mcp: MCPConfig::default(),
             cron: CronConfig::default(),
             git: GitConfig::from_env(),
+            github: GitHubConfig::from_env(),
         }
     }
 
@@ -289,6 +374,7 @@ impl Config {
         self.autopatcher.validate()?;
         self.cron.validate()?;
         self.git.validate()?;
+        self.github.validate()?;
         Ok(())
     }
 }

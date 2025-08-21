@@ -128,7 +128,11 @@ Based on analysis of the latest 100 commits, here are the established patterns:
 1. **Clone and analyze** the repository structure
 2. **Identify files** that don't follow the established patterns
 3. **Focus on recent changes** that might have introduced inconsistencies
-4. **Look for**:
+4. **Determine appropriate outcome**:
+   - **Self-improvement**: If the autopatcher itself needs improvements
+   - **Pull request**: If significant pattern violations are found in target repo
+   - **Regular patching**: For standard pattern compliance fixes
+5. **Look for**:
    - Inconsistent method naming
    - Missing error handling
    - Code duplication
@@ -137,7 +141,7 @@ Based on analysis of the latest 100 commits, here are the established patterns:
    - Race conditions
    - Inconsistent logging
 
-5. **Create patches** that:
+6. **Create patches** that:
    - Follow the established commit message format
    - Make minimal, focused changes
    - Add tests when fixing bugs
