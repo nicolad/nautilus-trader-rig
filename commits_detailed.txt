@@ -1,0 +1,160 @@
+f150badf4|Fix Bybit maker rebate fee signs|
+d71034d80|Improve reconciliation scenarios table|
+b77085656|Standardize crate READMEs|
+4109be0a5|Remove redundant std feature flag from network crate|
+03ffb57fd|Standardize log message formatting|
+53682dc90|Repair Windows build|Add defi feature flag for pyo3 crate to avoid activating high-precision.
+
+6cb2010fe|Standardize use of testers in examples|
+7281c0532|Add request_params for DataTesterConfig|
+fb948ffc8|Standardize crates documentation|
+1a66e6321|Add additional cryptocurrencies to currency maps|
+1808bee69|Fix PolymarketUserTrade bucket_index field type|Closes #2872.
+
+The `PolymarketUserTrade.bucket_index` field type changed from `str` to
+`int`.
+
+The change appears to be an undocumented API update that was discovered
+through runtime errors rather than being announced in a changelog.
+
+References:
+https://docs.polymarket.com/developers/CLOB/websocket/user-channel
+https://docs.polymarket.com/changelog/changelog
+
+1cc6bd4d6|Update dependencies and release notes|
+791c93d8f|Introduce efficient pool syncing command in the cli (#2871)|- Add Postgres functions for managing token table partitions
+- Add token-related queries in the blockchain cache database
+- Enhance error handling for DEX pool syncing and token processing
+- Add `sync-pools` command for DEX pool synchronization with enhanced chain and DEX validation
+- Refactor pool processing logic to improve efficiency and batch insert pools into the database
+9ebb8460a|Refine Databento message decoding|
+f09525657|Improve DataTester with subscribe_params config option|
+0583ddb7a|Standardize book subscription methods naming|
+431e598c9|Improve asyncio task tracking and cleanup for live clients|
+c406043e1|Update dependencies and release notes|
+e5a37f1b1|Increase nightly wheel retention|
+a77c97384|Add Windows signal handling guidance docs|
+aeb8839c9|Fix AttributeError when loading cached IBContract objects (#2862)|
+015c400e8|Refine OKX book subscription handling|
+d065eab23|Refine BitMEX book subscription handling|
+674026b4f|Standardize valid depths log formatting|
+46e046ca8|Improve book subscription handling to use proper book data types|Remove indirection of `only_deltas` boolean flag.
+
+2c01b3533|Fix mark and index price methods in adapters developer guide|
+986d01984|Fix mark and index price unsubscribe methods for LiveDataClient|
+7dbe5e977|Update dependencies and release notes|
+b06b09865|Fix race-condition on node shutdown in async InteractiveBrokersDataClient._disconnect() (#2865)|
+ccb287e07|Improve Docker configuration (#2868)|- Fix `POSTGRES_DATABASE` -> `POSTGRES_DB` for proper DB creation
+- Add console scripts copy to final Docker image
+- Add Nautilus service with correct /opt/nautilus mount pattern
+- Add test script for Docker setup validation
+66189b263|Refine get_start_time in TimeBarAggregator (#2866)|
+f907b333d|Improve BitMEX book handling and instrument parsing|
+37aeb20b1|Consolidate DataEngine order book subscription handlers|- Simplify data type checking logic
+- Remove redundant code duplication between handlers
+- Remove unreachable OrderBookDepth10 handling
+
+5048dd787|Add hypersync feature flag to nautilus-cli crate (#2863)|
+058527332|Introduce efficient block syncing command in the cli (#2861)|
+8d71cfbda|Refine equality check for FillReports|
+920b5464f|Refine reconciliation and live trading concept guide|
+0f6b243bb|Fix execution fee handling for Bybit|
+cd820018c|Refine logging for RetryManager|
+4d4e8f66e|Refine warning log for no-op delete account event|
+8ef1462ee|Fix incorrect base currency for cash SELL orders risk check|
+b45545327|Fix warning event logging for Strategy|
+b92ae06b0|Refine error message for Currency equality|
+d62cbea7b|Continue BitMEX adapter for execution|
+26199e1bc|Improve accounting validation errors with actual values|
+fa81e7995|Refine option spreads backtest execution|
+3de2abe81|Fix clippy lints|
+8ad656737|Update dependencies and release notes|
+d66fbcb99|Refactor quickstart notebook to use pure Python for better portability (#2855)|
+857d70395|Add support for execution of option spreads in backtesting (#2853)|
+5c9f3e0e6|Implement index prices for BitMEX adapter|
+1ae35f9e6|Add live reconciliation tests|
+f7a227a59|Refine live trading concept guide|
+f8964444f|Add python 3.12 to v2 build matrix|
+fc7baa96f|Update dependencies and release notes|
+1b198c894|Refine subscribe_bars in IB adapter (#2852)|
+0767365b7|Standardize headers|
+17461a7db|Add tests for execution report pyo3 conversions|- Add comprehensive tests for OrderStatusReport.from_pyo3()
+  - Add tests for FillReport.from_pyo3() field mappings
+  - Add tests for PositionStatusReport.from_pyo3()
+  - Test both minimal and maximal field scenarios
+  - Verify trigger_type, offsets, and venue_position_id mappings
+
+e03a966f2|Fix logging shutdown race condition causing truncated logs|- Drain channel with `try_recv()` after Close to capture in-flight
+messages
+- Make `logging_shutdown()` perform full graceful shutdown (not just
+flush)
+- Centralize log processing with `process_event` closure to eliminate
+duplication
+- Add test verifying 1000 message backlog is written during shutdown
+
+46f924b5a|Continue BitMEX adapter|
+8064d5cd0|Add due_post_only field for OrderRejected events|- Add `due_post_only` field to `OrderRejected` (Rust/Python/Cython)
+- Detect post-only rejections in Binance adapter (error code -5022)
+- Detect post-only rejections in Bybit adapter (EC_PostOnlyWillTakeLiquidity)
+- Update matching engine to set field for post-only order rejections
+- Add configuration option `log_rejected_due_post_only_as_warning`
+
+9afcf1bc9|Add due_post_only field for OrderRejected|
+17bab8d83|Refine make clean target|Include removal of generated .c files.
+
+5bf1a13cb|Support both Enum and String types for BacktestVenueConfig (#2846)|Closes #2843, many thanks again @woung717
+7a0ededbd|Add funding rate support for Cache|
+ac72cb9ca|Update dependencies and release notes|
+4b0502d3f|Standardize NAUTILUS_PATH env var across Tardis integration (#2850)|
+3368908bc|Reduce log level for Bybit external order execution|
+2ab02f28e|Consolidate indicators to reduce binary size and flatten imports|- Consolidate ~40 indicator modules into 7 files to reduce binary size
+- Flatten indicator imports from nested modules
+- Move Indicator base class from base.indicator submodule to base module
+
+93149a001|Add support for additional Databento consolidated schemas|- Add OHLCV_EOD, CMBP_1, CBBO_1S, CBBO_1M, and TCBBO schema support
+- Implement decode functions and loader support for consolidated schemas
+- Update `DatabentoDataClient` to allow consolidated schemas for subscriptions
+- Allow TBBO/TCBBO for both quote and trade subscriptions
+- Update documentation with schema selection guide and release notes
+
+f8a236855|Add caching and deduplication for funding rate updates|
+13ef36b31|Standardize adapters disconnect sequence and websocket close|
+7356ea50c|Refine LogGuard sender|
+51d64ff1e|Update dependencies and release notes|
+f446edfe4|Fix venue_order_id handling for Polymarket order status request (#2848)|
+d7b049e41|Improve ERC20 token metadata handling and error recovery (#2847)|* Fix argument missing in blockchain factory tests
+* Allow failure for ERC20 metadata calls with multicall for fetching single token info
+* Add revert reason decoding for ERC20 metadata failures and related tests
+* Add tests for handling empty ERC20 metadata fields and improve error validation
+* Separate multicall failed from decoding error in ERC20 contract
+* Handle decoding and multicall errors in token info fetching and exclude affected tokens from pool processing
+* Add initial documentation for blockchain smart contract integrations
+c705fbf69|Add support for option spread quotes in backtest (#2845)|
+c378c1348|Enhance positions report to mark snapshots (#2840)|
+ab3507ad4|Fix nautilus_trader v2 build|
+a97229bfa|Regenerate FFI headers with LogGuard documentation|
+521775beb|Remove print(msg) in TardisDataClient|
+e5d21eabc|Implement LogGuard reference counting for proper thread lifecycle|- Added reference counting to track active `LogGuard`s
+- Ensured logging thread completes all work before termination
+- Fixed early `LOGGING_INITIALIZED` flag setting
+- Simplified `LogGuard` to use global sender
+- Added proper thread handle management
+
+5e49c88bd|Upgrade Cython|
+dd599ddc0|Standardize crate manifests feature flagging and dependencies|
+d16f9bee9|Continue BitMEX adapter|
+6531c62e1|Add re-exports for tick_scheme subpackage|
+11a8208bb|Refine FundingRateUpdate data type|
+6461a8abb|Remove redundant RunnerEvent|
+b2b912894|Cleanup blockchain node test|
+bd78d9991|Refine Databento data client and node test|
+c178dfb8f|Update dependencies and release notes|
+2abb52c27|Remove redundant word in developer_guide (#2844)|
+3f893f1f9|Implement adapter support for FundingRateUpdate|
+b992f3d38|Continue wiring for FundingRateUpdate|
+11aa81c05|Continue BitMEX execution integration|
+1678a9d8e|Improve BitMEX adapter patterns and docs|
+31ea8a71b|Standardize BitMEX client patterns|
+5499714f5|Optimize AsyncRunner with reduced allocations|
+e0eb67ef7|Add benches and tests for AsyncRunner|
+060aa9575|Update dependencies and release notes|
