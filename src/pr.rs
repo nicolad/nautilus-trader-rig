@@ -308,6 +308,7 @@ impl PrManager {
         pattern.is_match(title)
     }
 
+    #[allow(dead_code)]
     async fn validate_file_change(&self, change: &FileChange) -> Result<Option<String>> {
         // Validate file patterns
         if change.path.contains("test")
@@ -326,6 +327,7 @@ impl PrManager {
         Ok(None)
     }
 
+    #[allow(dead_code)]
     async fn validate_rust_code(&self, code: &str) -> Result<Option<String>> {
         // Basic validation - could be enhanced with rust analyzer
         if !code.contains("use ") && code.len() > 100 {
@@ -335,6 +337,7 @@ impl PrManager {
         Ok(None)
     }
 
+    #[allow(dead_code)]
     async fn generate_suggestions(&self, issues: &[String]) -> Result<Vec<String>> {
         if issues.is_empty() {
             return Ok(vec!["PR looks good!".to_string()]);
@@ -352,6 +355,7 @@ impl PrManager {
         Ok(response.lines().map(|s| s.trim().to_string()).collect())
     }
 
+    #[allow(dead_code)]
     async fn analyze_repository(&self, _repo_path: &str) -> Result<RepoAnalysis> {
         // Placeholder for repository analysis
         Ok(RepoAnalysis {
@@ -362,6 +366,7 @@ impl PrManager {
         })
     }
 
+    #[allow(dead_code)]
     async fn identify_opportunities(&self, _analysis: &RepoAnalysis) -> Result<Vec<PrOpportunity>> {
         // Identify potential improvement opportunities
         Ok(vec![])
