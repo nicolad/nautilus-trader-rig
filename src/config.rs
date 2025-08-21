@@ -16,18 +16,6 @@ impl Default for CronConfig {
 }
 
 impl CronConfig {
-    /// Get schedule for every N minutes
-    pub fn every_minutes(minutes: u32) -> Self {
-        Self {
-            schedule: format!("0 */{} * * * *", minutes),
-        }
-    }
-
-    /// Get schedule for every 5 minutes (default)
-    pub fn every_5_minutes() -> Self {
-        Self::every_minutes(5)
-    }
-
     /// Validate cron configuration
     pub fn validate(&self) -> Result<(), String> {
         if self.schedule.is_empty() {

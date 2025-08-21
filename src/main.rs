@@ -66,13 +66,14 @@ impl DeepSeekClient {
 
     /// Send a simple prompt and get the complete response
     pub async fn prompt(&self, prompt: &str) -> Result<String> {
-        self.prompt_with_context(prompt, "Nautilus-Autopatcher").await
+        self.prompt_with_context(prompt, "Nautilus-Autopatcher")
+            .await
     }
 
     /// Send a prompt with a specific context/agent name
     pub async fn prompt_with_context(&self, prompt: &str, agent_name: &str) -> Result<String> {
         log::info!("🤖 Initializing agent: {}", agent_name);
-        
+
         let agent = self
             .client
             .agent(providers::deepseek::DEEPSEEK_CHAT)
@@ -80,20 +81,33 @@ impl DeepSeekClient {
             .name(agent_name)
             .build();
 
-        log::debug!("📤 Sending prompt to {}: {} chars", agent_name, prompt.len());
+        log::debug!(
+            "📤 Sending prompt to {}: {} chars",
+            agent_name,
+            prompt.len()
+        );
         let response = agent.prompt(prompt).await?;
-        log::info!("📥 Received response from {}: {} chars", agent_name, response.len());
-        
+        log::info!(
+            "📥 Received response from {}: {} chars",
+            agent_name,
+            response.len()
+        );
+
         Ok(response)
     }
 
     /// Stream a prompt and get real-time response (simplified for now)
     pub async fn stream_prompt(&self, prompt: &str) -> Result<String> {
-        self.stream_prompt_with_context(prompt, "Nautilus-Autopatcher-Stream").await
+        self.stream_prompt_with_context(prompt, "Nautilus-Autopatcher-Stream")
+            .await
     }
 
     /// Stream a prompt with a specific context/agent name
-    pub async fn stream_prompt_with_context(&self, prompt: &str, agent_name: &str) -> Result<String> {
+    pub async fn stream_prompt_with_context(
+        &self,
+        prompt: &str,
+        agent_name: &str,
+    ) -> Result<String> {
         println!("🤖 {} is thinking...", agent_name);
         std::io::Write::flush(&mut std::io::stdout())?;
 
@@ -108,7 +122,7 @@ impl DeepSeekClient {
 
 /// A small, conservative patch set that the model proposes.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
-struct PatchSet {
+pub struct PatchSet {
     /// Short title used as the commit summary.
     title: String,
     /// Human rationale (used in commit body).
@@ -273,12 +287,18 @@ async fn main() -> Result<()> {
             "⚠️  Using default 5-minute interval for non-standard schedule: {}",
             config.cron.schedule
         );
-        log::warn!("Using default 5-minute interval for non-standard schedule: {}", config.cron.schedule);
+        log::warn!(
+            "Using default 5-minute interval for non-standard schedule: {}",
+            config.cron.schedule
+        );
         5
     };
 
     println!("📅 Schedule: Every {} minutes", interval_minutes);
-    log::info!("Autopatcher scheduled to run every {} minutes", interval_minutes);
+    log::info!(
+        "Autopatcher scheduled to run every {} minutes",
+        interval_minutes
+    );
 
     // Create tokio interval for the specified minutes
     let mut interval = time::interval(Duration::from_secs(interval_minutes * 60));
@@ -296,24 +316,50 @@ async fn main() -> Result<()> {
 
     // Then run on schedule
     loop {
-        println!("⏰ Waiting for next scheduled run in {} minutes...", interval_minutes);
-        log::info!("Waiting for next scheduled run in {} minutes", interval_minutes);
-        
+        println!(
+            "⏰ Waiting for next scheduled run in {} minutes...",
+            interval_minutes
+        );
+        log::info!(
+            "Waiting for next scheduled run in {} minutes",
+            interval_minutes
+        );
+
         let next_run_time = chrono::Utc::now() + chrono::Duration::minutes(interval_minutes as i64);
-        println!("⏰ Next run scheduled for: {}", next_run_time.format("%Y-%m-%d %H:%M:%S UTC"));
-        log::info!("Next run scheduled for: {}", next_run_time.format("%Y-%m-%d %H:%M:%S UTC"));
-        
+        println!(
+            "⏰ Next run scheduled for: {}",
+            next_run_time.format("%Y-%m-%d %H:%M:%S UTC")
+        );
+        log::info!(
+            "Next run scheduled for: {}",
+            next_run_time.format("%Y-%m-%d %H:%M:%S UTC")
+        );
+
         interval.tick().await;
         run_count += 1;
-        println!("🔢 Execution #{}: Timer triggered - running autopatcher job", run_count);
-        log::info!("Execution #{}: Timer triggered - running autopatcher job", run_count);
-        
+        println!(
+            "🔢 Execution #{}: Timer triggered - running autopatcher job",
+            run_count
+        );
+        log::info!(
+            "Execution #{}: Timer triggered - running autopatcher job",
+            run_count
+        );
+
         let start_time = chrono::Utc::now();
         run_autopatcher_job().await;
         let duration = chrono::Utc::now() - start_time;
-        
-        println!("✅ Execution #{}: Completed in {}ms", run_count, duration.num_milliseconds());
-        log::info!("Execution #{}: Completed in {}ms", run_count, duration.num_milliseconds());
+
+        println!(
+            "✅ Execution #{}: Completed in {}ms",
+            run_count,
+            duration.num_milliseconds()
+        );
+        log::info!(
+            "Execution #{}: Completed in {}ms",
+            run_count,
+            duration.num_milliseconds()
+        );
     }
 }
 
@@ -329,10 +375,11 @@ async fn run_autopatcher() -> Result<()> {
     // Initialize logging
     println!("📋 Initializing enhanced logging for agent visibility");
     log::debug!("Initializing enhanced logging configuration");
-    
+
     // Initialize comprehensive logging system
     let logging_config = LoggingConfig::default();
-    let file_logger = logging::initialize_logging(logging_config).await
+    let file_logger = logging::initialize_logging(logging_config)
+        .await
         .context("Failed to initialize logging system")?;
 
     // Load configuration
@@ -367,51 +414,73 @@ async fn run_autopatcher() -> Result<()> {
     println!("   Candidates per iteration: {}", cfg.candidates);
     println!("   Max iterations: {}", cfg.max_iterations);
     println!("   Model: {}", cfg.model);
-    log::info!("Using AI model: {} with {} max tokens, temperature: {}", cfg.model, cfg.max_tokens, cfg.temperature);
+    log::info!(
+        "Using AI model: {} with {} max tokens, temperature: {}",
+        cfg.model,
+        cfg.max_tokens,
+        cfg.temperature
+    );
     println!("   Max tokens: {}", cfg.max_tokens);
     println!("   Temperature: {}", cfg.temperature);
     println!("   Streaming enabled: {}", cfg.enable_streaming);
     println!("   Parallel jobs: {}", cfg.jobs);
     println!("   Max files in snapshot: {}", cfg.snapshot_max_files);
     println!("   Max bytes per file: {}", cfg.snapshot_max_bytes);
-    println!("   Self-improvement enabled: {}", cfg.enable_self_improvement);
+    println!(
+        "   Self-improvement enabled: {}",
+        cfg.enable_self_improvement
+    );
     println!("   Auto PR creation enabled: {}", cfg.enable_auto_pr);
-    println!("   Outcome check frequency: every {} iteration(s)", cfg.outcome_check_frequency);
-    log::info!("Feature flags - Self-improvement: {}, Auto PR: {}, Check frequency: {}", 
-        cfg.enable_self_improvement, cfg.enable_auto_pr, cfg.outcome_check_frequency);
+    println!(
+        "   Outcome check frequency: every {} iteration(s)",
+        cfg.outcome_check_frequency
+    );
+    log::info!(
+        "Feature flags - Self-improvement: {}, Auto PR: {}, Check frequency: {}",
+        cfg.enable_self_improvement,
+        cfg.enable_auto_pr,
+        cfg.outcome_check_frequency
+    );
 
     // Git configuration info
     println!(
         "   👤 Git user: {} <{}>",
         config.git.user_name, config.git.user_email
     );
-    log::info!("Git configuration - User: {} <{}>", config.git.user_name, config.git.user_email);
+    log::info!(
+        "Git configuration - User: {} <{}>",
+        config.git.user_name,
+        config.git.user_email
+    );
     println!("   🚫 Excluded files: {:?}", config.git.excluded_files);
     log::debug!("Git excluded files: {:?}", config.git.excluded_files);
     println!();
 
     println!("📋 About to call run() function...");
     log::info!("Starting main autopatcher run function");
-    
+
     // Create operation logger for the main run
     let operation_logger = if let Some(logger) = file_logger.as_ref() {
         Some(OperationLogger::new("AUTOPATCHER_RUN", Some(logger.clone())).await)
     } else {
         None
     };
-    
+
     let result = run(&config, file_logger.as_ref()).await;
-    
+
     // Complete operation logging
     if let Some(op_logger) = operation_logger {
         op_logger.complete(result.is_ok()).await;
     }
-    
+
     println!(
         "📋 run() function completed with result: {:?}",
         result.is_ok()
     );
-    log::info!("Main run function completed with success: {}", result.is_ok());
+    log::info!(
+        "Main run function completed with success: {}",
+        result.is_ok()
+    );
     result
 }
 
@@ -480,32 +549,54 @@ async fn run(config: &Config, file_logger: Option<&FileLogger>) -> Result<()> {
     log::info!("DeepSeek client initialized successfully");
 
     let mut last_build_output: Option<String> = None;
-    
+
     println!("🚀 Starting main autopatcher iteration loop");
-    log::info!("Starting main autopatcher iteration loop with {} max iterations", cfg.max_iterations);
+    log::info!(
+        "Starting main autopatcher iteration loop with {} max iterations",
+        cfg.max_iterations
+    );
 
     // Check for special outcomes (self-improvement or PR creation) every iteration
     for iter in 1..=cfg.max_iterations {
         let iter_start_time = chrono::Utc::now();
         println!("\n🔄 === Iteration {iter}/{} ===", cfg.max_iterations);
         println!("⏰ Started at: {}", iter_start_time.format("%H:%M:%S UTC"));
-        log::info!("Starting iteration {}/{} at {}", iter, cfg.max_iterations, iter_start_time.format("%Y-%m-%d %H:%M:%S UTC"));
+        log::info!(
+            "Starting iteration {}/{} at {}",
+            iter,
+            cfg.max_iterations,
+            iter_start_time.format("%Y-%m-%d %H:%M:%S UTC")
+        );
 
         // Log to file
         if let Some(logger) = file_logger {
-            logger.iteration(iter as u32, cfg.max_iterations as u32, "Starting iteration").await?;
+            logger
+                .iteration(iter as u32, cfg.max_iterations as u32, "Starting iteration")
+                .await?;
         }
 
         // Check for special outcomes based on configuration
         if iter % cfg.outcome_check_frequency == 0 {
             println!("🎯 Checking for autopatcher outcomes...");
-            println!("📊 Status: Outcome check frequency reached (every {} iterations)", cfg.outcome_check_frequency);
-            log::info!("Checking for autopatcher outcomes (iteration {} is divisible by {})", iter, cfg.outcome_check_frequency);
-            
+            println!(
+                "📊 Status: Outcome check frequency reached (every {} iterations)",
+                cfg.outcome_check_frequency
+            );
+            log::info!(
+                "Checking for autopatcher outcomes (iteration {} is divisible by {})",
+                iter,
+                cfg.outcome_check_frequency
+            );
+
             if let Some(logger) = file_logger {
-                logger.debug(&format!("Checking outcomes - iteration {} divisible by {}", iter, cfg.outcome_check_frequency)).await?;
+                logger
+                    .debug(&format!(
+                        "Checking outcomes - iteration {} divisible by {}",
+                        iter, cfg.outcome_check_frequency
+                    ))
+                    .await?;
             }
-            
+
             println!("🤖 Status: Calling AI to determine outcomes...");
             log::info!("Calling AI to determine autopatcher outcomes");
 
@@ -518,8 +609,12 @@ async fn run(config: &Config, file_logger: Option<&FileLogger>) -> Result<()> {
                             println!("🔧 Self-improvement triggered: {}", reason);
                             println!("   📋 Patch: {}", patch.title);
                             println!("   🔧 Status: Applying self-improvement patch...");
-                            log::info!("Self-improvement triggered: {} - Patch: {}", reason, patch.title);
-                            
+                            log::info!(
+                                "Self-improvement triggered: {} - Patch: {}",
+                                reason,
+                                patch.title
+                            );
+
                             // Apply self-improvement
                             if let Err(e) = apply_self_improvement(&patch, config).await {
                                 println!("❌ Self-improvement failed: {}", e);
@@ -528,8 +623,12 @@ async fn run(config: &Config, file_logger: Option<&FileLogger>) -> Result<()> {
                                 log::info!("Continuing with normal iterations after self-improvement failure");
                             } else {
                                 println!("✅ Self-improvement applied successfully!");
-                                log::info!("Self-improvement applied successfully, process will restart");
-                                println!("🔄 Process will restart automatically on next cron run...");
+                                log::info!(
+                                    "Self-improvement applied successfully, process will restart"
+                                );
+                                println!(
+                                    "🔄 Process will restart automatically on next cron run..."
+                                );
                                 return Ok(()); // Exit to allow restart
                             }
                         } else {
@@ -545,15 +644,20 @@ async fn run(config: &Config, file_logger: Option<&FileLogger>) -> Result<()> {
                     } => {
                         if cfg.enable_auto_pr {
                             println!("📤 Creating pull request: {}", title);
-                            println!("   📝 Description: {}", description.chars().take(100).collect::<String>());
-                            
+                            println!(
+                                "   📝 Description: {}",
+                                description.chars().take(100).collect::<String>()
+                            );
+
                             if let Err(e) = create_pull_request(
                                 &title,
                                 &description,
                                 &patch,
                                 target_branch.as_deref(),
                                 config,
-                            ).await {
+                            )
+                            .await
+                            {
                                 println!("❌ PR creation failed: {}", e);
                                 println!("   ⏭️  Continuing with normal iterations...");
                             } else {
@@ -571,13 +675,20 @@ async fn run(config: &Config, file_logger: Option<&FileLogger>) -> Result<()> {
             }
         } else {
             println!("� Status: Skipping outcome check (not at frequency interval)");
-            log::debug!("Skipping outcome check - iteration {} not divisible by {}", iter, cfg.outcome_check_frequency);
+            log::debug!(
+                "Skipping outcome check - iteration {} not divisible by {}",
+                iter,
+                cfg.outcome_check_frequency
+            );
         }
 
         println!("�📸 Taking codebase snapshot...");
-        println!("📊 Status: Analyzing target directory: {}", cfg.target.display());
+        println!(
+            "📊 Status: Analyzing target directory: {}",
+            cfg.target.display()
+        );
         log::info!("Taking codebase snapshot from {}", cfg.target.display());
-        
+
         let snapshot_start = std::time::Instant::now();
         let files = snapshot_codebase_smart(
             &cfg.target,
@@ -586,14 +697,26 @@ async fn run(config: &Config, file_logger: Option<&FileLogger>) -> Result<()> {
             last_build_output.as_deref(),
         )?;
         let snapshot_duration = snapshot_start.elapsed();
-        
-        println!("   📝 Captured {} files in {:?}", files.len(), snapshot_duration);
-        log::info!("Snapshot completed: {} files in {:?}", files.len(), snapshot_duration);
-        
+
+        println!(
+            "   📝 Captured {} files in {:?}",
+            files.len(),
+            snapshot_duration
+        );
+        log::info!(
+            "Snapshot completed: {} files in {:?}",
+            files.len(),
+            snapshot_duration
+        );
+
         let total_bytes: usize = files.values().map(|content| content.len()).sum();
-        println!("   📊 Total snapshot size: {} bytes ({:.1} KB)", total_bytes, total_bytes as f64 / 1024.0);
+        println!(
+            "   📊 Total snapshot size: {} bytes ({:.1} KB)",
+            total_bytes,
+            total_bytes as f64 / 1024.0
+        );
         log::info!("Total snapshot size: {} bytes", total_bytes);
-        
+
         for (path, content) in &files {
             println!("      {} ({} bytes)", path, content.len());
         }
@@ -615,20 +738,29 @@ async fn run(config: &Config, file_logger: Option<&FileLogger>) -> Result<()> {
                 "📋 Including previous build output ({} chars)",
                 build_output.len()
             );
-            log::info!("Including previous build output ({} chars) in analysis", build_output.len());
+            log::info!(
+                "Including previous build output ({} chars) in analysis",
+                build_output.len()
+            );
         } else {
             println!("📋 No previous build output to include");
             log::info!("No previous build output available for analysis");
         }
 
         println!("🧠 Requesting patch proposals from DeepSeek...");
-        println!("📊 Status: Preparing AI prompt with {} candidates requested", cfg.candidates);
-        log::info!("Requesting {} patch candidates from DeepSeek AI", cfg.candidates);
-        
+        println!(
+            "📊 Status: Preparing AI prompt with {} candidates requested",
+            cfg.candidates
+        );
+        log::info!(
+            "Requesting {} patch candidates from DeepSeek AI",
+            cfg.candidates
+        );
+
         let plan_json = serde_json::to_string_pretty(&input)?;
         println!("   📤 Sending prompt ({} chars)", plan_json.len());
         log::info!("Sending prompt to AI ({} chars)", plan_json.len());
-        
+
         let ai_start_time = std::time::Instant::now();
         let prompt = format!(
             r#"
@@ -658,16 +790,27 @@ Input:
         );
 
         println!("⏳ Status: Waiting for AI response...");
-        let raw = client.prompt_with_context(&prompt, "Code-Patch-Generator").await.context("LLM call failed")?;
+        let raw = client
+            .prompt_with_context(&prompt, "Code-Patch-Generator")
+            .await
+            .context("LLM call failed")?;
         let ai_duration = ai_start_time.elapsed();
-        
-        println!("   📥 Received response ({} chars) in {:?}", raw.len(), ai_duration);
-        log::info!("Received AI response ({} chars) in {:?}", raw.len(), ai_duration);
+
+        println!(
+            "   📥 Received response ({} chars) in {:?}",
+            raw.len(),
+            ai_duration
+        );
+        log::info!(
+            "Received AI response ({} chars) in {:?}",
+            raw.len(),
+            ai_duration
+        );
 
         println!("🔍 Parsing patch proposals...");
         println!("📊 Status: Extracting JSON from AI response...");
         log::info!("Parsing patch proposals from AI response");
-        
+
         let parsed = parse_patches(&raw)?;
         if parsed.is_empty() {
             println!("❌ Model returned no patches; stopping iteration");
@@ -677,11 +820,16 @@ Input:
 
         println!("   ✅ Found {} patch proposals:", parsed.len());
         log::info!("Successfully parsed {} patch proposals", parsed.len());
-        
+
         for (i, ps) in parsed.iter().enumerate() {
             println!("      {} - {} ({} edits)", i + 1, ps.title, ps.edits.len());
-            log::debug!("Patch {}: {} with {} edits", i + 1, ps.title, ps.edits.len());
-            
+            log::debug!(
+                "Patch {}: {} with {} edits",
+                i + 1,
+                ps.title,
+                ps.edits.len()
+            );
+
             for edit in &ps.edits {
                 match edit {
                     Edit::ReplaceFile { path, content } => {
@@ -737,8 +885,12 @@ Input:
             cfg.jobs
         );
         println!("📊 Status: Configuring thread pool for parallel evaluation");
-        log::info!("Starting parallel evaluation of {} candidates using {} jobs", parsed.len(), cfg.jobs);
-        
+        log::info!(
+            "Starting parallel evaluation of {} candidates using {} jobs",
+            parsed.len(),
+            cfg.jobs
+        );
+
         rayon::ThreadPoolBuilder::new()
             .num_threads(cfg.jobs)
             .build_global()
@@ -746,7 +898,7 @@ Input:
 
         let eval_start_time = std::time::Instant::now();
         println!("⏳ Status: Running parallel patch evaluation...");
-        
+
         let evals: Vec<_> = parsed
             .par_iter()
             .enumerate()
@@ -756,8 +908,16 @@ Input:
                 let candidate_start = std::time::Instant::now();
                 let result = try_build_and_test_in_temp(&cfg, ps);
                 let candidate_duration = candidate_start.elapsed();
-                println!("   ✅ Completed evaluation of candidate {} in {:?}", i + 1, candidate_duration);
-                log::debug!("Completed evaluation of candidate {} in {:?}", i + 1, candidate_duration);
+                println!(
+                    "   ✅ Completed evaluation of candidate {} in {:?}",
+                    i + 1,
+                    candidate_duration
+                );
+                log::debug!(
+                    "Completed evaluation of candidate {} in {:?}",
+                    i + 1,
+                    candidate_duration
+                );
                 (i, result)
             })
             .collect();
@@ -800,7 +960,10 @@ Input:
                         log::debug!(
                             "Candidate {} error: {}",
                             i + 1,
-                            eval.build_stderr.lines().next().unwrap_or("No error message")
+                            eval.build_stderr
+                                .lines()
+                                .next()
+                                .unwrap_or("No error message")
                         );
                     }
                 }
@@ -810,9 +973,17 @@ Input:
                 }
             }
         }
-        
-        println!("📊 Summary: {}/{} candidates passed evaluation", successful_candidates, parsed.len());
-        log::info!("Evaluation summary: {}/{} candidates passed", successful_candidates, parsed.len());
+
+        println!(
+            "📊 Summary: {}/{} candidates passed evaluation",
+            successful_candidates,
+            parsed.len()
+        );
+        log::info!(
+            "Evaluation summary: {}/{} candidates passed",
+            successful_candidates,
+            parsed.len()
+        );
 
         // Winner = first candidate where check & tests both pass.
         if let Some((i, Ok(_ce))) = evals.into_iter().find(|(_, r)| {
@@ -828,25 +999,29 @@ Input:
             log::info!("Winner selected: Candidate {} - {}", i + 1, ps.title);
 
             println!("🔄 Applying patch to real repository...");
-            println!("📊 Status: Applying {} edits to {}", ps.edits.len(), cfg.target.display());
+            println!(
+                "📊 Status: Applying {} edits to {}",
+                ps.edits.len(),
+                cfg.target.display()
+            );
             log::info!("Applying patch with {} edits to repository", ps.edits.len());
-            
+
             let apply_start = std::time::Instant::now();
             apply_patchset_transactional(&cfg.target, ps)
                 .context("Failed to apply patchset transactionally to real repo")?;
             let apply_duration = apply_start.elapsed();
-            
+
             println!("   ✅ Patch applied successfully in {:?}", apply_duration);
             log::info!("Patch applied successfully in {:?}", apply_duration);
 
             println!("📝 Committing changes...");
             println!("📊 Status: Preparing git commit...");
             log::info!("Preparing git commit for applied changes");
-            
+
             ensure_git_repo(&cfg.target, &config.git)?;
             git_add_all_filtered(&cfg.target, &config.git)?;
             let commit_msg = format!("{} [autopatch]\n\n{}", ps.title.trim(), ps.rationale.trim());
-            
+
             println!("📊 Status: Committing with message: {}", ps.title.trim());
             git_commit_with_config(&cfg.target, &commit_msg, &config.git)?;
             println!("🎉 Committed successfully!");
@@ -856,20 +1031,28 @@ Input:
             println!("📤 Pushing changes...");
             println!("📊 Status: Pushing to remote repository...");
             log::info!("Pushing changes to remote repository");
-            
+
             let push_start = std::time::Instant::now();
             git_push(&cfg.target)?;
             let push_duration = push_start.elapsed();
-            
+
             println!("🚀 Pushed successfully in {:?}!", push_duration);
             log::info!("Push completed successfully in {:?}", push_duration);
 
             last_build_output = None;
-            
+
             // Iteration completed successfully
             let iter_duration = chrono::Utc::now() - iter_start_time;
-            println!("✅ Iteration {} completed successfully in {}ms", iter, iter_duration.num_milliseconds());
-            log::info!("Iteration {} completed successfully in {}ms", iter, iter_duration.num_milliseconds());
+            println!(
+                "✅ Iteration {} completed successfully in {}ms",
+                iter,
+                iter_duration.num_milliseconds()
+            );
+            log::info!(
+                "Iteration {} completed successfully in {}ms",
+                iter,
+                iter_duration.num_milliseconds()
+            );
         } else {
             println!("💔 No candidate passed both build and tests.");
             println!("📝 Capturing build output for next iteration...");
@@ -886,16 +1069,27 @@ Input:
 
             if let Some(ref output) = last_build_output {
                 println!("   📋 Captured {} chars of build output", output.len());
-                log::info!("Captured {} chars of build output for next iteration", output.len());
+                log::info!(
+                    "Captured {} chars of build output for next iteration",
+                    output.len()
+                );
             }
-            
+
             let iter_duration = chrono::Utc::now() - iter_start_time;
-            println!("❌ Iteration {} failed in {}ms - stopping", iter, iter_duration.num_milliseconds());
-            log::warn!("Iteration {} failed in {}ms", iter, iter_duration.num_milliseconds());
+            println!(
+                "❌ Iteration {} failed in {}ms - stopping",
+                iter,
+                iter_duration.num_milliseconds()
+            );
+            log::warn!(
+                "Iteration {} failed in {}ms",
+                iter,
+                iter_duration.num_milliseconds()
+            );
             break;
         }
     }
-    
+
     println!("🏁 Autopatcher run completed");
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     log::info!("Autopatcher run completed");
@@ -936,36 +1130,6 @@ fn read_instructions(target_dir: &Path) -> Option<String> {
         println!("📋 No INSTRUCTIONS.md found");
         None
     }
-}
-
-/// Helper function to recursively copy a directory
-fn copy_dir_all(src: &Path, dst: &Path) -> Result<()> {
-    fs::create_dir_all(dst)?;
-    for entry in fs::read_dir(src)? {
-        let entry = entry?;
-        let path = entry.path();
-        let file_name = entry.file_name();
-
-        // Skip certain directories and files
-        if let Some(name) = file_name.to_str() {
-            if name.starts_with('.')
-                && (name == ".git" || name == ".autopatch_worktrees" || name == ".autopatch_temp")
-            {
-                continue;
-            }
-            if name == "target" {
-                continue;
-            }
-        }
-
-        let dst_path = dst.join(file_name);
-        if path.is_dir() {
-            copy_dir_all(&path, &dst_path)?;
-        } else {
-            fs::copy(&path, &dst_path)?;
-        }
-    }
-    Ok(())
 }
 
 /// Candidate result from temp evaluation.
@@ -1627,15 +1791,6 @@ fn run_cargo(root: &Path, args: &[&str]) -> Result<()> {
     Ok(())
 }
 
-fn run_cargo_capture(root: &Path, args: &[&str]) -> Result<std::process::Output> {
-    Ok(Command::new("cargo")
-        .args(args)
-        .current_dir(root)
-        .stderr(Stdio::piped())
-        .stdout(Stdio::piped())
-        .output()?)
-}
-
 fn ensure_git_repo(root: &Path, git_config: &GitConfig) -> Result<()> {
     let inside = Command::new("git")
         .args(["rev-parse", "--is-inside-work-tree"])
@@ -1747,30 +1902,6 @@ fn git_commit_with_config(root: &Path, msg: &str, git_config: &GitConfig) -> Res
     Ok(())
 }
 
-fn git_add_all(root: &Path) -> Result<()> {
-    let ok = Command::new("git")
-        .args(["add", "-A"])
-        .current_dir(root)
-        .status()?
-        .success();
-    if !ok {
-        return Err(anyhow!("git add -A failed"));
-    }
-    Ok(())
-}
-
-fn git_commit(root: &Path, msg: &str) -> Result<()> {
-    let ok = Command::new("git")
-        .args(["commit", "-m", msg])
-        .current_dir(root)
-        .status()?
-        .success();
-    if !ok {
-        return Err(anyhow!("git commit failed"));
-    }
-    Ok(())
-}
-
 fn git_push(root: &Path) -> Result<()> {
     // Detect if we have an upstream, otherwise skip.
     let has_upstream = Command::new("git")
@@ -1817,7 +1948,7 @@ fn extract_json_from_response(response: &str) -> Option<String> {
     let mut brace_count = 0;
     let mut start_idx = None;
     let mut end_idx = None;
-    
+
     for (i, ch) in response.char_indices() {
         match ch {
             '{' => {
@@ -1836,7 +1967,7 @@ fn extract_json_from_response(response: &str) -> Option<String> {
             _ => {}
         }
     }
-    
+
     if let (Some(start), Some(end)) = (start_idx, end_idx) {
         let json_str = &response[start..end];
         // Validate it's actually JSON by trying to parse as Value
@@ -1844,7 +1975,7 @@ fn extract_json_from_response(response: &str) -> Option<String> {
             return Some(json_str.to_string());
         }
     }
-    
+
     // Fallback: try to find JSON between ```json blocks
     if let Some(json_start) = response.find("```json") {
         if let Some(json_end) = response[json_start + 7..].find("```") {
@@ -1854,7 +1985,7 @@ fn extract_json_from_response(response: &str) -> Option<String> {
             }
         }
     }
-    
+
     None
 }
 
@@ -1875,7 +2006,7 @@ async fn analyze_self_for_improvements(
     // Read main source files
     for file in [
         "src/main.rs",
-        "src/config.rs", 
+        "src/config.rs",
         "Cargo.toml",
         "INSTRUCTIONS.md",
     ] {
@@ -1934,7 +2065,11 @@ Generate a specific, implementable improvement now.
             .map(|(path, content)| {
                 // Truncate very long files to avoid token limits
                 let truncated_content = if content.len() > 3000 {
-                    format!("{}...\n[TRUNCATED - {} total chars]", &content[..3000], content.len())
+                    format!(
+                        "{}...\n[TRUNCATED - {} total chars]",
+                        &content[..3000],
+                        content.len()
+                    )
                 } else {
                     content.clone()
                 };
@@ -1944,14 +2079,19 @@ Generate a specific, implementable improvement now.
             .join("\n")
     );
 
-    let response = client.prompt_with_context(&analysis_prompt, "Self-Improvement-Analyzer").await?;
-    
-    log::debug!("Self-improvement analysis response received ({} chars)", response.len());
+    let response = client
+        .prompt_with_context(&analysis_prompt, "Self-Improvement-Analyzer")
+        .await?;
+
+    log::debug!(
+        "Self-improvement analysis response received ({} chars)",
+        response.len()
+    );
     log::trace!("Raw response: {}", response);
 
     // Try to extract JSON from the response
     let json_response = extract_json_from_response(&response);
-    
+
     // Try to parse as self-improvement outcome
     if let Some(json_str) = json_response {
         log::debug!("Attempting to parse extracted JSON: {}", json_str);
@@ -1962,17 +2102,24 @@ Generate a specific, implementable improvement now.
                 return Ok(Some(outcome));
             }
             Err(e) => {
-                log::warn!("Failed to parse extracted JSON as AutopatcherOutcome: {}", e);
+                log::warn!(
+                    "Failed to parse extracted JSON as AutopatcherOutcome: {}",
+                    e
+                );
                 log::debug!("Problematic JSON: {}", json_str);
             }
         }
     }
 
     // Check for no improvements response - but we don't accept this!
-    if response.contains("no_improvements") || response.to_lowercase().contains("no significant improvements") {
+    if response.contains("no_improvements")
+        || response
+            .to_lowercase()
+            .contains("no significant improvements")
+    {
         println!("❌ AI claims no improvements needed, but that's impossible!");
         log::warn!("AI returned 'no improvements' which should never happen - forcing a fallback improvement");
-        
+
         // Force a concrete improvement - add tests for a function that lacks them
         return Ok(Some(AutopatcherOutcome::SelfImprove {
             reason: "All Rust code should have comprehensive test coverage for reliability".to_string(),
@@ -1990,9 +2137,15 @@ Generate a specific, implementable improvement now.
     }
 
     println!("⚠️  Could not parse self-improvement analysis response");
-    log::warn!("Could not parse self-improvement analysis response. Response length: {}", response.len());
-    log::debug!("Unparseable response: {}", response.chars().take(500).collect::<String>());
-    
+    log::warn!(
+        "Could not parse self-improvement analysis response. Response length: {}",
+        response.len()
+    );
+    log::debug!(
+        "Unparseable response: {}",
+        response.chars().take(500).collect::<String>()
+    );
+
     // Even if we can't parse, force an improvement - performance optimization
     log::info!("Forcing a performance improvement since parsing failed");
     return Ok(Some(AutopatcherOutcome::SelfImprove {
@@ -2015,30 +2168,42 @@ async fn apply_self_improvement(patch: &PatchSet, config: &Config) -> Result<()>
     println!("🔧 Applying self-improvement patch: {}", patch.title);
 
     let current_dir = std::env::current_dir()?;
-    
+
     // Debug: Print the patch details before applying
     println!("📝 Patch details:");
     println!("   Title: {}", patch.title);
     println!("   Rationale: {}", patch.rationale);
     println!("   Number of edits: {}", patch.edits.len());
-    
+
     for (i, edit) in patch.edits.iter().enumerate() {
         match edit {
-            Edit::SearchReplace { path, search, replace, .. } => {
+            Edit::SearchReplace {
+                path,
+                search,
+                replace,
+                ..
+            } => {
                 println!("   Edit {}: SearchReplace in {}", i + 1, path);
-                println!("     Search (first 100 chars): {}", &search.chars().take(100).collect::<String>());
-                println!("     Replace (first 100 chars): {}", &replace.chars().take(100).collect::<String>());
-                
+                println!(
+                    "     Search (first 100 chars): {}",
+                    &search.chars().take(100).collect::<String>()
+                );
+                println!(
+                    "     Replace (first 100 chars): {}",
+                    &replace.chars().take(100).collect::<String>()
+                );
+
                 // Verify file exists
                 let file_path = current_dir.join(path);
                 if !file_path.exists() {
                     return Err(anyhow!("File does not exist: {}", path));
                 }
-                
+
                 // Verify search text exists in file
-                let file_content = tokio::fs::read_to_string(&file_path).await
+                let file_content = tokio::fs::read_to_string(&file_path)
+                    .await
                     .with_context(|| format!("Failed to read file: {}", path))?;
-                
+
                 if !file_content.contains(search) {
                     println!("❌ Search text not found in file {}", path);
                     println!("   File size: {} chars", file_content.len());
@@ -2049,15 +2214,16 @@ async fn apply_self_improvement(patch: &PatchSet, config: &Config) -> Result<()>
             Edit::InsertAfter { path, anchor, .. } => {
                 println!("   Edit {}: InsertAfter in {} after anchor", i + 1, path);
                 println!("     Anchor: {}", anchor);
-                
+
                 let file_path = current_dir.join(path);
                 if !file_path.exists() {
                     return Err(anyhow!("File does not exist: {}", path));
                 }
-                
-                let file_content = tokio::fs::read_to_string(&file_path).await
+
+                let file_content = tokio::fs::read_to_string(&file_path)
+                    .await
                     .with_context(|| format!("Failed to read file: {}", path))?;
-                
+
                 if !file_content.contains(anchor) {
                     println!("❌ Anchor text not found in file {}", path);
                     return Err(anyhow!("Anchor text not found in file: {}", path));
@@ -2066,15 +2232,16 @@ async fn apply_self_improvement(patch: &PatchSet, config: &Config) -> Result<()>
             Edit::InsertBefore { path, anchor, .. } => {
                 println!("   Edit {}: InsertBefore in {} before anchor", i + 1, path);
                 println!("     Anchor: {}", anchor);
-                
+
                 let file_path = current_dir.join(path);
                 if !file_path.exists() {
                     return Err(anyhow!("File does not exist: {}", path));
                 }
-                
-                let file_content = tokio::fs::read_to_string(&file_path).await
+
+                let file_content = tokio::fs::read_to_string(&file_path)
+                    .await
                     .with_context(|| format!("Failed to read file: {}", path))?;
-                
+
                 if !file_content.contains(anchor) {
                     println!("❌ Anchor text not found in file {}", path);
                     return Err(anyhow!("Anchor text not found in file: {}", path));
@@ -2083,7 +2250,7 @@ async fn apply_self_improvement(patch: &PatchSet, config: &Config) -> Result<()>
             Edit::ReplaceFile { path, content } => {
                 println!("   Edit {}: ReplaceFile {}", i + 1, path);
                 println!("     New content length: {} chars", content.len());
-                
+
                 let file_path = current_dir.join(path);
                 // File doesn't need to exist for ReplaceFile
                 println!("     Target path: {}", file_path.display());
@@ -2149,7 +2316,7 @@ async fn create_pull_request(
     println!("   📝 Description: {}", description);
     println!("   🌿 Target branch: {}", target_branch.unwrap_or("main"));
     println!("   🔧 Patch contains {} edits", patch.edits.len());
-    
+
     // For now, just log what we would do
     // In a real implementation, this would:
     // 1. Clone the target repository
@@ -2157,7 +2324,7 @@ async fn create_pull_request(
     // 3. Apply the patch
     // 4. Push the branch
     // 5. Create a PR via GitHub API
-    
+
     println!("📤 Pull request (placeholder) created successfully!");
     Ok(())
 }
@@ -2171,7 +2338,9 @@ async fn determine_outcome(
     println!("🤔 Determining appropriate autopatcher outcome...");
 
     if let Some(logger) = file_logger {
-        logger.debug("Starting outcome determination analysis").await?;
+        logger
+            .debug("Starting outcome determination analysis")
+            .await?;
     }
 
     // First, check if we should self-improve
@@ -2241,17 +2410,22 @@ If no significant issues found, respond with: {{"no_pr_needed": true}}
             .join("\n")
     );
 
-    let response = client.prompt_with_context(&pr_analysis_prompt, "PR-Opportunity-Analyzer").await?;
-    
+    let response = client
+        .prompt_with_context(&pr_analysis_prompt, "PR-Opportunity-Analyzer")
+        .await?;
+
     log::debug!("PR analysis response received ({} chars)", response.len());
     log::trace!("Raw PR analysis response: {}", response);
 
     // Try to extract JSON from the response
     let json_response = extract_json_from_response(&response);
-    
+
     // Try to parse as PR outcome
     if let Some(json_str) = json_response {
-        log::debug!("Attempting to parse extracted JSON for PR outcome: {}", json_str);
+        log::debug!(
+            "Attempting to parse extracted JSON for PR outcome: {}",
+            json_str
+        );
         match serde_json::from_str::<AutopatcherOutcome>(&json_str) {
             Ok(outcome) => {
                 println!("✅ PR opportunity identified");
@@ -2259,21 +2433,32 @@ If no significant issues found, respond with: {{"no_pr_needed": true}}
                 return Ok(Some(outcome));
             }
             Err(e) => {
-                log::warn!("Failed to parse extracted JSON as AutopatcherOutcome for PR: {}", e);
+                log::warn!(
+                    "Failed to parse extracted JSON as AutopatcherOutcome for PR: {}",
+                    e
+                );
                 log::debug!("Problematic PR JSON: {}", json_str);
             }
         }
     }
 
-    if response.contains("no_pr_needed") || response.to_lowercase().contains("no significant issues") {
+    if response.contains("no_pr_needed")
+        || response.to_lowercase().contains("no significant issues")
+    {
         println!("✅ No PR needed at this time");
         log::info!("AI determined no PR is needed");
         return Ok(None);
     }
 
     println!("⚠️  Could not parse outcome analysis response");
-    log::warn!("Could not parse PR analysis response. Response length: {}", response.len());
-    log::debug!("Unparseable PR response: {}", response.chars().take(500).collect::<String>());
+    log::warn!(
+        "Could not parse PR analysis response. Response length: {}",
+        response.len()
+    );
+    log::debug!(
+        "Unparseable PR response: {}",
+        response.chars().take(500).collect::<String>()
+    );
     Ok(None)
 }
 
@@ -2281,11 +2466,11 @@ If no significant issues found, respond with: {{"no_pr_needed": true}}
 fn parse_patches(raw: &str) -> Result<Vec<PatchSet>> {
     log::debug!("Parsing patches from response ({} chars)", raw.len());
     log::trace!("Raw patch response: {}", raw);
-    
+
     // Try to extract JSON from the response using our robust extractor
     let json_str = extract_json_from_response(raw)
         .ok_or_else(|| anyhow!("Could not extract valid JSON from LLM response"))?;
-    
+
     log::debug!("Extracted JSON for patch parsing: {}", json_str);
 
     #[derive(Deserialize)]
@@ -2295,8 +2480,11 @@ fn parse_patches(raw: &str) -> Result<Vec<PatchSet>> {
 
     let response: Response = serde_json::from_str(&json_str)
         .context("Failed to parse extracted JSON as patch response")?;
-    
-    log::info!("Successfully parsed {} patches from LLM response", response.patches.len());
+
+    log::info!(
+        "Successfully parsed {} patches from LLM response",
+        response.patches.len()
+    );
     Ok(response.patches)
 }
 
