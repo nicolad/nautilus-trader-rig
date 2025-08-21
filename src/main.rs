@@ -41,7 +41,10 @@ use tokio::time;
 use walkdir::WalkDir;
 
 mod config;
+mod logging;
+
 use config::{AutopatcherConfig, Config, GitConfig};
+use logging::{FileLogger, LoggingConfig, OperationLogger};
 
 /// DeepSeek client using rig framework
 pub struct DeepSeekClient {
@@ -326,30 +329,11 @@ async fn run_autopatcher() -> Result<()> {
     // Initialize logging
     println!("📋 Initializing enhanced logging for agent visibility");
     log::debug!("Initializing enhanced logging configuration");
-    // Initialize logging with better defaults
-    if std::env::var("RUST_LOG").is_err() {
-        std::env::set_var("RUST_LOG", "info");
-        println!("📋 Set RUST_LOG to info level");
-        log::debug!("Set RUST_LOG environment variable to info level");
-    }
-
-    match env_logger::Builder::from_default_env()
-        .filter_level(log::LevelFilter::Info)
-        .format_timestamp_secs()
-        .try_init()
-    {
-        Ok(_) => {
-            println!("📋 Logger initialized successfully");
-            log::info!("Logger initialized successfully with enhanced configuration");
-        }
-        Err(e) => {
-            println!(
-                "📋 Logger initialization failed (probably already initialized): {}",
-                e
-            );
-            log::warn!("Logger initialization failed (probably already initialized): {}", e);
-        }
-    }
+    
+    // Initialize comprehensive logging system
+    let logging_config = LoggingConfig::default();
+    let file_logger = logging::initialize_logging(logging_config).await
+        .context("Failed to initialize logging system")?;
 
     // Load configuration
     println!("📋 Loading configuration...");
@@ -408,7 +392,21 @@ async fn run_autopatcher() -> Result<()> {
 
     println!("📋 About to call run() function...");
     log::info!("Starting main autopatcher run function");
-    let result = run(&config).await;
+    
+    // Create operation logger for the main run
+    let operation_logger = if let Some(logger) = file_logger.as_ref() {
+        Some(OperationLogger::new("AUTOPATCHER_RUN", Some(logger.clone())).await)
+    } else {
+        None
+    };
+    
+    let result = run(&config, file_logger.as_ref()).await;
+    
+    // Complete operation logging
+    if let Some(op_logger) = operation_logger {
+        op_logger.complete(result.is_ok()).await;
+    }
+    
     println!(
         "📋 run() function completed with result: {:?}",
         result.is_ok()
@@ -417,7 +415,7 @@ async fn run_autopatcher() -> Result<()> {
     result
 }
 
-async fn run(config: &Config) -> Result<()> {
+async fn run(config: &Config, file_logger: Option<&FileLogger>) -> Result<()> {
     println!("📋 Entered run() function");
     let cfg = &config.autopatcher;
 
@@ -493,16 +491,25 @@ async fn run(config: &Config) -> Result<()> {
         println!("⏰ Started at: {}", iter_start_time.format("%H:%M:%S UTC"));
         log::info!("Starting iteration {}/{} at {}", iter, cfg.max_iterations, iter_start_time.format("%Y-%m-%d %H:%M:%S UTC"));
 
+        // Log to file
+        if let Some(logger) = file_logger {
+            logger.iteration(iter as u32, cfg.max_iterations as u32, "Starting iteration").await?;
+        }
+
         // Check for special outcomes based on configuration
         if iter % cfg.outcome_check_frequency == 0 {
             println!("🎯 Checking for autopatcher outcomes...");
             println!("📊 Status: Outcome check frequency reached (every {} iterations)", cfg.outcome_check_frequency);
             log::info!("Checking for autopatcher outcomes (iteration {} is divisible by {})", iter, cfg.outcome_check_frequency);
             
+            if let Some(logger) = file_logger {
+                logger.debug(&format!("Checking outcomes - iteration {} divisible by {}", iter, cfg.outcome_check_frequency)).await?;
+            }
+            
             println!("🤖 Status: Calling AI to determine outcomes...");
             log::info!("Calling AI to determine autopatcher outcomes");
 
-            if let Some(outcome) = determine_outcome(&client, config).await? {
+            if let Some(outcome) = determine_outcome(&client, config, file_logger).await? {
                 println!("✅ Outcome determined by AI");
                 log::info!("Autopatcher outcome determined: {:?}", outcome);
                 match outcome {
@@ -1854,6 +1861,7 @@ fn extract_json_from_response(response: &str) -> Option<String> {
 /// Analyze the autopatcher's own codebase for improvements
 async fn analyze_self_for_improvements(
     client: &DeepSeekClient,
+    _file_logger: Option<&FileLogger>,
 ) -> Result<Option<AutopatcherOutcome>> {
     println!("🔍 Analyzing autopatcher codebase for self-improvements...");
     log::info!("Starting comprehensive self-improvement analysis - improvements are mandatory");
@@ -1880,44 +1888,58 @@ async fn analyze_self_for_improvements(
     }
 
     let analysis_prompt = format!(
-        r#"Analyze this Rust autopatcher codebase for potential improvements. Focus on:
+        r#"Analyze this Rust autopatcher codebase for potential improvements. Focus on immediate, practical improvements:
 
-1. Code quality and structure improvements
-2. Performance optimizations  
-3. Better error handling
-4. Documentation improvements
-5. Configuration enhancements
-6. Adding missing functionality
+1. Code duplication reduction
+2. Better error messages  
+3. Performance optimizations
+4. Adding missing functionality like file logging
+5. Configuration improvements
 
 Current codebase files:
 {}
 
-Look for specific improvements that would make this autopatcher more effective, reliable, or maintainable.
+You MUST find specific improvements that can be implemented. Look for:
+- Duplicate code that can be consolidated
+- Missing error handling
+- Inefficient patterns
+- Missing logging or debugging capabilities  
+- Configuration validation issues
+- Missing functionality
 
-If you find significant improvements needed, respond with JSON in this format:
+IMPORTANT: Only suggest changes to files that are included above. Do not reference files not shown.
+
+Respond with JSON in this format:
 {{
   "type": "SelfImprove",
   "reason": "Brief explanation of why improvement is needed",
   "patch": {{
-    "title": "Improve autopatcher [description]",
-    "rationale": "Detailed explanation of the improvement",
+    "title": "Add file logging capability to autopatcher",
+    "rationale": "The autopatcher needs file-based logging for better debugging and monitoring. Currently only console output is available.",
     "edits": [
       {{
-        "kind": "SearchReplace",
+        "kind": "InsertAfter",
         "path": "src/main.rs",
-        "search": "exact text to find",
-        "replace": "exact replacement text",
-        "occurrences": 1
+        "anchor": "use walkdir::WalkDir;",
+        "insert": "\n// Add file logging imports\nuse std::sync::atomic::{{AtomicBool, Ordering}};\nuse chrono::DateTime;\n\n/// File logger for autopatcher activity\nstatic mut FILE_LOGGER: Option<std::fs::File> = None;\nstatic LOGGER_INIT: AtomicBool = AtomicBool::new(false);"
       }}
     ]
   }}
 }}
 
-If no significant improvements are needed, respond with: {{"no_improvements": true}}
+Generate a specific, implementable improvement now.
 "#,
         self_files
             .iter()
-            .map(|(path, content)| format!("=== {} ===\n{}\n", path, content))
+            .map(|(path, content)| {
+                // Truncate very long files to avoid token limits
+                let truncated_content = if content.len() > 3000 {
+                    format!("{}...\n[TRUNCATED - {} total chars]", &content[..3000], content.len())
+                } else {
+                    content.clone()
+                };
+                format!("=== {} ===\n{}\n", path, truncated_content)
+            })
             .collect::<Vec<_>>()
             .join("\n")
     );
@@ -1993,6 +2015,81 @@ async fn apply_self_improvement(patch: &PatchSet, config: &Config) -> Result<()>
     println!("🔧 Applying self-improvement patch: {}", patch.title);
 
     let current_dir = std::env::current_dir()?;
+    
+    // Debug: Print the patch details before applying
+    println!("📝 Patch details:");
+    println!("   Title: {}", patch.title);
+    println!("   Rationale: {}", patch.rationale);
+    println!("   Number of edits: {}", patch.edits.len());
+    
+    for (i, edit) in patch.edits.iter().enumerate() {
+        match edit {
+            Edit::SearchReplace { path, search, replace, .. } => {
+                println!("   Edit {}: SearchReplace in {}", i + 1, path);
+                println!("     Search (first 100 chars): {}", &search.chars().take(100).collect::<String>());
+                println!("     Replace (first 100 chars): {}", &replace.chars().take(100).collect::<String>());
+                
+                // Verify file exists
+                let file_path = current_dir.join(path);
+                if !file_path.exists() {
+                    return Err(anyhow!("File does not exist: {}", path));
+                }
+                
+                // Verify search text exists in file
+                let file_content = tokio::fs::read_to_string(&file_path).await
+                    .with_context(|| format!("Failed to read file: {}", path))?;
+                
+                if !file_content.contains(search) {
+                    println!("❌ Search text not found in file {}", path);
+                    println!("   File size: {} chars", file_content.len());
+                    println!("   Search text: {}", search);
+                    return Err(anyhow!("Search text not found in file: {}", path));
+                }
+            }
+            Edit::InsertAfter { path, anchor, .. } => {
+                println!("   Edit {}: InsertAfter in {} after anchor", i + 1, path);
+                println!("     Anchor: {}", anchor);
+                
+                let file_path = current_dir.join(path);
+                if !file_path.exists() {
+                    return Err(anyhow!("File does not exist: {}", path));
+                }
+                
+                let file_content = tokio::fs::read_to_string(&file_path).await
+                    .with_context(|| format!("Failed to read file: {}", path))?;
+                
+                if !file_content.contains(anchor) {
+                    println!("❌ Anchor text not found in file {}", path);
+                    return Err(anyhow!("Anchor text not found in file: {}", path));
+                }
+            }
+            Edit::InsertBefore { path, anchor, .. } => {
+                println!("   Edit {}: InsertBefore in {} before anchor", i + 1, path);
+                println!("     Anchor: {}", anchor);
+                
+                let file_path = current_dir.join(path);
+                if !file_path.exists() {
+                    return Err(anyhow!("File does not exist: {}", path));
+                }
+                
+                let file_content = tokio::fs::read_to_string(&file_path).await
+                    .with_context(|| format!("Failed to read file: {}", path))?;
+                
+                if !file_content.contains(anchor) {
+                    println!("❌ Anchor text not found in file {}", path);
+                    return Err(anyhow!("Anchor text not found in file: {}", path));
+                }
+            }
+            Edit::ReplaceFile { path, content } => {
+                println!("   Edit {}: ReplaceFile {}", i + 1, path);
+                println!("     New content length: {} chars", content.len());
+                
+                let file_path = current_dir.join(path);
+                // File doesn't need to exist for ReplaceFile
+                println!("     Target path: {}", file_path.display());
+            }
+        }
+    }
 
     // Apply the patch to our own codebase
     apply_patchset_transactional(&current_dir, patch)
@@ -2007,9 +2104,14 @@ async fn apply_self_improvement(patch: &PatchSet, config: &Config) -> Result<()>
         .context("Failed to run cargo check")?;
 
     if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        println!("❌ Compilation failed:");
+        println!("STDOUT: {}", stdout);
+        println!("STDERR: {}", stderr);
         return Err(anyhow!(
             "Self-improvement patch breaks compilation: {}",
-            String::from_utf8_lossy(&output.stderr)
+            stderr
         ));
     }
 
@@ -2056,19 +2158,24 @@ async fn create_pull_request(
     // 4. Push the branch
     // 5. Create a PR via GitHub API
     
-    println!("� Pull request (placeholder) created successfully!");
-.autopatch_backups/    Ok(())
+    println!("📤 Pull request (placeholder) created successfully!");
+    Ok(())
 }
 
 /// Determine what outcome to take based on analysis
 async fn determine_outcome(
     client: &DeepSeekClient,
     config: &Config,
+    file_logger: Option<&FileLogger>,
 ) -> Result<Option<AutopatcherOutcome>> {
     println!("🤔 Determining appropriate autopatcher outcome...");
 
+    if let Some(logger) = file_logger {
+        logger.debug("Starting outcome determination analysis").await?;
+    }
+
     // First, check if we should self-improve
-    if let Some(self_improvement) = analyze_self_for_improvements(client).await? {
+    if let Some(self_improvement) = analyze_self_for_improvements(client, file_logger).await? {
         return Ok(Some(self_improvement));
     }
 

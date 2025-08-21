@@ -9,6 +9,7 @@
 
 # Logs
 /logs/
+/.logs/
 
 # macOS
 .DS_Store
