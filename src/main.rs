@@ -50,6 +50,7 @@ use improve::Improver;
 use logging::{FileLogger, LoggingConfig, OperationLogger};
 
 /// DeepSeek client using rig framework
+#[derive(Clone)]
 pub struct DeepSeekClient {
     client: providers::deepseek::Client,
 }
@@ -1817,28 +1818,60 @@ fn ensure_git_repo(root: &Path, git_config: &GitConfig) -> Result<()> {
 /// Enhanced git functions that use GitConfig for authentication and configuration
 
 fn configure_git_user(root: &Path, git_config: &GitConfig) -> Result<()> {
-    // Configure git user name
-    let ok = Command::new("git")
-        .args(["config", "user.name", &git_config.user_name])
+    // Check if local git user is already configured
+    let local_name_output = Command::new("git")
+        .args(["config", "--local", "user.name"])
         .current_dir(root)
-        .status()?
-        .success();
-    if !ok {
-        return Err(anyhow!("Failed to configure git user.name"));
+        .output()?;
+
+    let local_email_output = Command::new("git")
+        .args(["config", "--local", "user.email"])
+        .current_dir(root)
+        .output()?;
+
+    let has_local_name = local_name_output.status.success() && !local_name_output.stdout.is_empty();
+    let has_local_email =
+        local_email_output.status.success() && !local_email_output.stdout.is_empty();
+
+    if has_local_name && has_local_email {
+        let local_name = String::from_utf8_lossy(&local_name_output.stdout)
+            .trim()
+            .to_string();
+        let local_email = String::from_utf8_lossy(&local_email_output.stdout)
+            .trim()
+            .to_string();
+        println!(
+            "   ✅ Using existing local git user: {} <{}>",
+            local_name, local_email
+        );
+        return Ok(());
     }
 
-    // Configure git user email
-    let ok = Command::new("git")
-        .args(["config", "user.email", &git_config.user_email])
-        .current_dir(root)
-        .status()?
-        .success();
-    if !ok {
-        return Err(anyhow!("Failed to configure git user.email"));
+    // Only configure if local config is missing
+    if !has_local_name {
+        let ok = Command::new("git")
+            .args(["config", "--local", "user.name", &git_config.user_name])
+            .current_dir(root)
+            .status()?
+            .success();
+        if !ok {
+            return Err(anyhow!("Failed to configure git user.name"));
+        }
+    }
+
+    if !has_local_email {
+        let ok = Command::new("git")
+            .args(["config", "--local", "user.email", &git_config.user_email])
+            .current_dir(root)
+            .status()?
+            .success();
+        if !ok {
+            return Err(anyhow!("Failed to configure git user.email"));
+        }
     }
 
     println!(
-        "   ✅ Configured git user: {} <{}>",
+        "   ✅ Configured missing git user settings: {} <{}>",
         git_config.user_name, git_config.user_email
     );
     Ok(())
@@ -1894,14 +1927,44 @@ fn git_commit_with_config(root: &Path, msg: &str, git_config: &GitConfig) -> Res
     // Configure git user first
     configure_git_user(root, git_config)?;
 
-    let ok = Command::new("git")
+    // Check if there are changes to commit
+    let status_output = Command::new("git")
+        .args(["status", "--porcelain"])
+        .current_dir(root)
+        .output()?;
+
+    if status_output.stdout.is_empty() {
+        println!("ℹ️  No changes to commit - working tree clean");
+        return Ok(());
+    }
+
+    // Try to commit with detailed error information
+    let commit_output = Command::new("git")
         .args(["commit", "-m", msg])
         .current_dir(root)
-        .status()?
-        .success();
-    if !ok {
-        return Err(anyhow!("git commit failed"));
+        .output()?;
+
+    if !commit_output.status.success() {
+        let stderr = String::from_utf8_lossy(&commit_output.stderr);
+        let stdout = String::from_utf8_lossy(&commit_output.stdout);
+
+        eprintln!("Git commit failed:");
+        eprintln!("Command: git commit -m \"{}\"", msg);
+        eprintln!("Working directory: {}", root.display());
+        eprintln!("Exit code: {:?}", commit_output.status.code());
+        eprintln!("Stdout: {}", stdout);
+        eprintln!("Stderr: {}", stderr);
+
+        // Check if it's because there's nothing to commit
+        if stderr.contains("nothing to commit") || stderr.contains("working tree clean") {
+            println!("ℹ️  Nothing to commit - working tree clean");
+            return Ok(());
+        }
+
+        return Err(anyhow!("git commit failed: {}", stderr.trim()));
     }
+
+    println!("✅ Successfully committed: {}", msg);
     Ok(())
 }
 
