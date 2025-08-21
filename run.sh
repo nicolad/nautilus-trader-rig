@@ -1,5 +1,12 @@
 #!/bin/bash
 
-echo "🎯 Starting shuttle-cron-gh utilities..."
+echo "🎯 Starting Nautilus Trader Autopatcher locally..."
 
-shuttle run --secrets Secrets.toml
+# Load environment variables from .env if it exists
+if [ -f .env ]; then
+    echo "📋 Loading environment variables from .env"
+    export $(cat .env | grep -v '^#' | xargs)
+fi
+
+# Run the application
+cargo run

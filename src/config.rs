@@ -163,8 +163,6 @@ mod tests {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GitConfig {
-    /// GitHub personal access token for authentication
-    pub github_token: Option<String>,
     /// Git user name for commits
     pub user_name: String,
     /// Git user email for commits
@@ -180,12 +178,10 @@ pub struct GitConfig {
 impl Default for GitConfig {
     fn default() -> Self {
         Self {
-            github_token: None,
             user_name: "nicolad".to_string(),
             user_email: "nicolai.vadim@gmail.com".to_string(),
             excluded_files: vec![
                 ".gitignore".to_string(),
-                "Secrets.toml".to_string(),
                 ".env".to_string(),
                 "*.pem".to_string(),
                 "*.key".to_string(),
@@ -200,12 +196,10 @@ impl GitConfig {
     /// Load Git configuration from environment
     pub fn from_env() -> Self {
         Self {
-            github_token: std::env::var("GITHUB_TOKEN").ok(),
             user_name: "nicolad".to_string(),
             user_email: "nicolai.vadim@gmail.com".to_string(),
             excluded_files: vec![
                 ".gitignore".to_string(),
-                "Secrets.toml".to_string(),
                 ".env".to_string(),
                 "*.pem".to_string(),
                 "*.key".to_string(),

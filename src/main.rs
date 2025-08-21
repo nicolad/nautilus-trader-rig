@@ -155,116 +155,42 @@ async fn run_autopatcher_job() {
     println!("🔄 Autopatcher job cycle completed at: {:?}", Utc::now());
 }
 
-#[shuttle_runtime::main]
-async fn main(
-    #[shuttle_runtime::Secrets] secrets: shuttle_runtime::SecretStore,
-) -> Result<MyService, shuttle_runtime::Error> {
-    // Load all secrets from Shuttle and set them as environment variables
-    println!("🔑 Loading secrets from Shuttle SecretStore...");
+#[tokio::main]
+async fn main() -> Result<()> {
+    // Load environment variables from .env file if present
+    let _ = dotenv();
+    
+    println!("� Starting Nautilus Trader Autopatcher...");
 
-    // Load GitHub token from Shuttle secrets
-    if let Some(token) = secrets.get("GITHUB_TOKEN") {
-        std::env::set_var("GITHUB_TOKEN", &token);
+    // Load configuration
+    let config = Config::from_env();
+
+    // Parse interval from cron schedule - for "0 */5 * * * *" we want 5 minutes
+    let interval_minutes = if config.cron.schedule == "0 */5 * * * *" {
+        5
+    } else {
+        // Default to 5 minutes if we can't parse the schedule
         println!(
-            "🔑 GitHub token loaded from Shuttle secrets ({}...)",
-            &token[..token.len().min(8)]
+            "⚠️  Using default 5-minute interval for non-standard schedule: {}",
+            config.cron.schedule
         );
-    } else {
-        println!("⚠️  No GitHub token found in Shuttle secrets");
-    }
+        5
+    };
 
-    // Load DeepSeek API key from Shuttle secrets
-    if let Some(deepseek_key) = secrets.get("DEEPSEEK_API_KEY") {
-        std::env::set_var("DEEPSEEK_API_KEY", &deepseek_key);
-        println!("🤖 DeepSeek API key loaded from Shuttle secrets");
-    } else {
-        println!("⚠️  No DeepSeek API key found in Shuttle secrets");
-    }
+    println!("📅 Schedule: Every {} minutes", interval_minutes);
 
-    // Load OpenAI API key from Shuttle secrets (optional)
-    if let Some(openai_key) = secrets.get("OPENAI_API_KEY") {
-        std::env::set_var("OPENAI_API_KEY", &openai_key);
-        println!("🤖 OpenAI API key loaded from Shuttle secrets");
-    }
+    // Create tokio interval for the specified minutes
+    let mut interval = time::interval(Duration::from_secs(interval_minutes * 60));
 
-    // Load database URL from Shuttle secrets (optional)
-    if let Some(database_url) = secrets.get("DATABASE_URL") {
-        std::env::set_var("DATABASE_URL", &database_url);
-        println!("🗄️  Database URL loaded from Shuttle secrets");
-    }
+    // Run first execution immediately
+    println!("🎯 Running first execution immediately...");
+    run_autopatcher_job().await;
 
-    // Load other optional API keys
-    if let Some(resend_key) = secrets.get("RESEND_API_KEY") {
-        std::env::set_var("RESEND_API_KEY", &resend_key);
-        println!("📧 Resend API key loaded from Shuttle secrets");
-    }
-
-    if let Some(clerk_key) = secrets.get("CLERK_SECRET_KEY") {
-        std::env::set_var("CLERK_SECRET_KEY", &clerk_key);
-        println!("🔐 Clerk secret key loaded from Shuttle secrets");
-    }
-
-    if let Some(neverbounce_key) = secrets.get("NEVERBOUNCE_API_KEY") {
-        std::env::set_var("NEVERBOUNCE_API_KEY", &neverbounce_key);
-        println!("📋 NeverBounce API key loaded from Shuttle secrets");
-    }
-
-    println!("✅ Secrets loading completed");
-
-    Ok(MyService {})
-}
-
-// Simple service structure
-struct MyService {}
-
-#[shuttle_runtime::async_trait]
-impl shuttle_runtime::Service for MyService {
-    async fn bind(self, _addr: std::net::SocketAddr) -> Result<(), shuttle_runtime::Error> {
-        println!("🚀 Starting Nautilus Trader Autopatcher with Tokio Timer...");
-
-        // Load configuration
-        let config = Config::from_env();
-
-        // Parse interval from cron schedule - for "0 */5 * * * *" we want 5 minutes
-        let interval_minutes = if config.cron.schedule == "0 */5 * * * *" {
-            5
-        } else {
-            // Default to 5 minutes if we can't parse the schedule
-            println!(
-                "⚠️  Using default 5-minute interval for non-standard schedule: {}",
-                config.cron.schedule
-            );
-            5
-        };
-
-        println!("📅 Schedule: Every {} minutes", interval_minutes);
-
-        // Create tokio interval for the specified minutes
-        let mut interval = time::interval(Duration::from_secs(interval_minutes * 60));
-
-        // Run first execution immediately
-        println!("🎯 Running first execution immediately...");
+    // Then run on schedule
+    loop {
+        interval.tick().await;
+        println!("⏰ Timer tick - running autopatcher job...");
         run_autopatcher_job().await;
-
-        // Then run on schedule
-        loop {
-            println!("⏱️  Waiting for next interval...");
-            interval.tick().await;
-            println!("⏰ Timer triggered - running autopatcher job...");
-
-            // Run with timeout to prevent hanging
-            let timeout_duration = Duration::from_secs(30 * 60); // 30 minutes timeout
-            match tokio::time::timeout(timeout_duration, run_autopatcher_job()).await {
-                Ok(_) => println!("🔄 Job completed within timeout"),
-                Err(_) => {
-                    eprintln!(
-                        "⚠️  Job timed out after {} seconds",
-                        timeout_duration.as_secs()
-                    );
-                    eprintln!("⚠️  Continuing to next cycle...");
-                }
-            }
-        }
     }
 }
 
@@ -275,34 +201,23 @@ async fn run_autopatcher() -> Result<()> {
     dotenv().ok();
     println!("📋 Environment variables loaded with dotenv");
 
-    // Initialize logging with detailed output (only if not running on Shuttle)
-    // Shuttle has its own tracing subscriber that conflicts with env_logger
-    let is_shuttle = std::env::var("SHUTTLE").is_ok()
-        || std::env::var("SHUTTLE_PROJECT_ID").is_ok()
-        || std::env::var("SHUTTLE_SERVICE_NAME").is_ok();
+    // Initialize logging
+    println!("📋 Initializing env_logger");
+    if std::env::var("RUST_LOG").is_err() {
+        std::env::set_var("RUST_LOG", "info");
+        println!("📋 Set RUST_LOG to info level");
+    }
 
-    if is_shuttle {
-        println!("📋 Running on Shuttle - skipping env_logger initialization");
-        println!("📋 Using Shuttle's built-in tracing subscriber");
-    } else {
-        println!("📋 Running locally - initializing env_logger");
-        if std::env::var("RUST_LOG").is_err() {
-            std::env::set_var("RUST_LOG", "info");
-            println!("📋 Set RUST_LOG to info level");
-        }
-
-        // Only initialize env_logger when NOT running on Shuttle
-        match env_logger::Builder::from_default_env()
-            .filter_level(log::LevelFilter::Info)
-            .format_timestamp_secs()
-            .try_init()
-        {
-            Ok(_) => println!("📋 Logger initialized successfully"),
-            Err(e) => println!(
-                "📋 Logger initialization failed (probably already initialized): {}",
-                e
-            ),
-        }
+    match env_logger::Builder::from_default_env()
+        .filter_level(log::LevelFilter::Info)
+        .format_timestamp_secs()
+        .try_init()
+    {
+        Ok(_) => println!("📋 Logger initialized successfully"),
+        Err(e) => println!(
+            "📋 Logger initialization failed (probably already initialized): {}",
+            e
+        ),
     }
 
     // Load configuration
@@ -337,14 +252,6 @@ async fn run_autopatcher() -> Result<()> {
     println!("   Max bytes per file: {}", cfg.snapshot_max_bytes);
 
     // Git configuration info
-    if let Some(token) = &config.git.github_token {
-        println!(
-            "   🔐 GitHub token: configured ({}...)",
-            &token[..token.len().min(8)]
-        );
-    } else {
-        println!("   🔐 GitHub token: not configured");
-    }
     println!(
         "   👤 Git user: {} <{}>",
         config.git.user_name, config.git.user_email
@@ -390,17 +297,16 @@ async fn run(config: &Config) -> Result<()> {
 
     if std::env::var("DEEPSEEK_API_KEY").is_err() {
         eprintln!("❌ DEEPSEEK_API_KEY environment variable not found");
-        eprintln!("📋 Attempting to load from Secrets.toml through dotenv...");
 
         // Try to load from .env file or current directory
-        let _ = dotenvy::from_filename("Secrets.toml");
+        let _ = dotenvy::from_filename(".env");
 
         if std::env::var("DEEPSEEK_API_KEY").is_err() {
             return Err(anyhow!(
-                "DEEPSEEK_API_KEY environment variable not set and not found in Secrets.toml"
+                "DEEPSEEK_API_KEY environment variable not set and not found in .env"
             ));
         } else {
-            println!("   ✅ DEEPSEEK_API_KEY loaded from Secrets.toml");
+            println!("   ✅ DEEPSEEK_API_KEY loaded from .env");
         }
     } else {
         println!("   ✅ DEEPSEEK_API_KEY found in environment");
@@ -610,7 +516,7 @@ Input:
             println!("   💾 Commit message: {}", ps.title.trim());
 
             println!("📤 Pushing changes...");
-            git_push_with_token(&cfg.target, &config.git)?;
+            git_push(&cfg.target)?;
             println!("🚀 Pushed successfully!");
 
             last_build_output = None;
@@ -648,7 +554,6 @@ Pay attention to any instructions provided - they contain guidance for what impr
 
 IMPORTANT: NEVER modify these protected files:
 - .gitignore (git configuration)
-- Secrets.toml (sensitive configuration)
 - .env files (environment variables)
 - *.pem, *.key files (cryptographic keys)
 - Any file containing secrets, tokens, or credentials
@@ -674,87 +579,6 @@ fn read_instructions(target_dir: &Path) -> Option<String> {
         println!("📋 No INSTRUCTIONS.md found");
         None
     }
-}
-
-/// Shuttle-specific version that uses directory copying instead of git worktree
-fn try_build_and_test_shuttle(cfg: &AutopatcherConfig, ps: &PatchSet) -> Result<CandidateEval> {
-    println!("      📁 Creating temporary directory copy for Shuttle...");
-    let temp_root = cfg.target.join(".autopatch_temp");
-    fs::create_dir_all(&temp_root)?;
-    let ts = SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis();
-    let thread_id = std::thread::current().id();
-    let name = format!("temp-{:?}-{}-{}", thread_id, std::process::id(), ts);
-    let temp_dir = temp_root.join(&name);
-
-    // Copy source directory
-    copy_dir_all(&cfg.target, &temp_dir)?;
-    println!("         📁 {}", temp_dir.display());
-
-    // Ensure cleanup
-    struct TempDirGuard {
-        path: PathBuf,
-    }
-    impl Drop for TempDirGuard {
-        fn drop(&mut self) {
-            let _ = fs::remove_dir_all(&self.path);
-        }
-    }
-    let _guard = TempDirGuard {
-        path: temp_dir.clone(),
-    };
-
-    println!("      ⚡ Applying patches in temp directory...");
-    apply_patchset_atomic_only(&temp_dir, ps)?;
-    println!("         ✅ Patches applied");
-
-    // Per-candidate target dir to avoid parallel lock contention.
-    let target_dir = temp_dir.join("target");
-    let target_dir_str = target_dir.to_string_lossy();
-    let envs = [("CARGO_TARGET_DIR", target_dir_str.as_ref())];
-
-    println!("      🔍 Running cargo check (JSON) in Shuttle...");
-    let check_out = run_cargo_capture_env(&temp_dir, &["check", "--message-format=json"], &envs)?;
-    let check_ok = check_out.status.success();
-    let mut build_stderr = String::new();
-
-    // Capture a compact build log: prefer stdout (JSON) with a small tail; also include stderr.
-    let mut joined = String::new();
-    joined.push_str(&String::from_utf8_lossy(&check_out.stdout));
-    joined.push_str(&String::from_utf8_lossy(&check_out.stderr));
-    if joined.len() > 64 * 1024 {
-        joined = format!("{}[...truncated...]", &joined[joined.len() - 64 * 1024..]);
-    }
-    build_stderr.push_str(&joined);
-    println!(
-        "         {} cargo check",
-        if check_ok { "✅" } else { "❌" }
-    );
-
-    let tests_ok = if check_ok {
-        println!("      🧪 Running cargo test (JSON) in Shuttle...");
-        let test_out = run_cargo_capture_env(&temp_dir, &["test", "--message-format=json"], &envs)?;
-        let success = test_out.status.success();
-        if !success {
-            let mut tjoined = String::new();
-            tjoined.push_str(&String::from_utf8_lossy(&test_out.stdout));
-            tjoined.push_str(&String::from_utf8_lossy(&test_out.stderr));
-            if tjoined.len() > 64 * 1024 {
-                tjoined = format!("{}[...truncated...]", &tjoined[tjoined.len() - 64 * 1024..]);
-            }
-            build_stderr.push_str(&tjoined);
-        }
-        println!("         {} cargo test", if success { "✅" } else { "❌" });
-        success
-    } else {
-        println!("         ⏭️ Skipping tests (check failed)");
-        false
-    };
-
-    Ok(CandidateEval {
-        check_ok,
-        tests_ok,
-        build_stderr,
-    })
 }
 
 /// Helper function to recursively copy a directory
@@ -801,16 +625,6 @@ struct CandidateEval {
 /// 3) cargo check with JSON output,
 /// 4) cargo test with JSON output.
 fn try_build_and_test_in_temp(cfg: &AutopatcherConfig, ps: &PatchSet) -> Result<CandidateEval> {
-    // Check if we're in Shuttle environment
-    let is_shuttle = std::env::var("SHUTTLE").is_ok()
-        || std::env::var("SHUTTLE_PROJECT_ID").is_ok()
-        || std::env::var("SHUTTLE_SERVICE_NAME").is_ok();
-
-    if is_shuttle {
-        println!("      🏭 Running in Shuttle environment - using directory copy instead of git worktree");
-        return try_build_and_test_shuttle(cfg, ps);
-    }
-
     println!("      🌿 Creating temporary git worktree at HEAD...");
     let worktrees_root = cfg.target.join(".autopatch_worktrees");
     fs::create_dir_all(&worktrees_root)?;
@@ -934,17 +748,14 @@ fn run_cargo_capture_env(
         }
         return Ok(cmd.output()?);
     }
-    
-    // Fallback to rustc-based validation for Shuttle environment
+
+    // Fallback to rustc-based validation when cargo is not available
     println!("   🦀 Using rustc-based validation (native cargo not available)");
     run_rustc_validation(root, args)
 }
 
 // Run rustc-based validation when cargo is not available
-fn run_rustc_validation(
-    root: &Path,
-    args: &[&str],
-) -> Result<std::process::Output> {
+fn run_rustc_validation(root: &Path, args: &[&str]) -> Result<std::process::Output> {
     // Map cargo commands to rustc equivalents
     if args.contains(&"check") {
         // For cargo check, use rustc --emit=metadata
@@ -953,7 +764,7 @@ fn run_rustc_validation(
         // For cargo test, use rustc --test
         return run_rustc_test(root);
     }
-    
+
     // Default fallback - just return success
     let success_output = Command::new("echo")
         .arg("Validation skipped - using rustc fallback")
@@ -965,7 +776,7 @@ fn run_rustc_validation(
 fn run_rustc_check(root: &Path) -> Result<std::process::Output> {
     let main_rs = root.join("src/main.rs");
     let lib_rs = root.join("src/lib.rs");
-    
+
     let target_file = if main_rs.exists() {
         main_rs
     } else if lib_rs.exists() {
@@ -973,7 +784,7 @@ fn run_rustc_check(root: &Path) -> Result<std::process::Output> {
     } else {
         return Err(anyhow!("No main.rs or lib.rs found for rustc validation"));
     };
-    
+
     // Try to run rustc with basic syntax checking
     let result = Command::new("rustc")
         .args(&[
@@ -989,7 +800,7 @@ fn run_rustc_check(root: &Path) -> Result<std::process::Output> {
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .output();
-    
+
     match result {
         Ok(output) => Ok(output),
         Err(_) => {
@@ -1008,7 +819,7 @@ fn run_rustc_check(root: &Path) -> Result<std::process::Output> {
 fn run_rustc_test(root: &Path) -> Result<std::process::Output> {
     // For test validation, we'll do basic syntax checking on test files
     let tests_dir = root.join("tests");
-    
+
     if tests_dir.exists() {
         // Try to compile test files
         for entry in fs::read_dir(&tests_dir)? {
@@ -1026,7 +837,7 @@ fn run_rustc_test(root: &Path) -> Result<std::process::Output> {
                     .stdout(Stdio::piped())
                     .stderr(Stdio::piped())
                     .output();
-                
+
                 if let Ok(output) = test_result {
                     if !output.status.success() {
                         return Ok(output);
@@ -1035,7 +846,7 @@ fn run_rustc_test(root: &Path) -> Result<std::process::Output> {
             }
         }
     }
-    
+
     // If no test files or rustc not available, return success
     let success_output = Command::new("echo")
         .arg("Test validation completed")
@@ -1579,66 +1390,6 @@ fn git_commit_with_config(root: &Path, msg: &str, git_config: &GitConfig) -> Res
     Ok(())
 }
 
-fn git_push_with_token(root: &Path, git_config: &GitConfig) -> Result<()> {
-    // Check if GitHub token is available
-    let github_token = match &git_config.github_token {
-        Some(token) if !token.is_empty() => token,
-        _ => {
-            println!("ℹ️  No GitHub token configured; skipping authenticated push.");
-            return git_push(root); // Fall back to regular push
-        }
-    };
-
-    // Get the current remote URL
-    let remote_output = Command::new("git")
-        .args(["remote", "get-url", "origin"])
-        .current_dir(root)
-        .output()?;
-
-    if !remote_output.status.success() {
-        println!("ℹ️  No origin remote configured; skipping push.");
-        return Ok(());
-    }
-
-    let remote_url_raw = String::from_utf8_lossy(&remote_output.stdout);
-    let remote_url = remote_url_raw.trim();
-
-    // Convert SSH URL to HTTPS if needed
-    let https_url = if remote_url.starts_with("git@github.com:") {
-        remote_url.replace("git@github.com:", "https://github.com/")
-    } else if remote_url.starts_with("https://github.com/") {
-        remote_url.to_string()
-    } else {
-        println!("ℹ️  Remote URL is not a GitHub repository; skipping authenticated push.");
-        return git_push(root);
-    };
-
-    // Create authenticated URL
-    let auth_url = format!(
-        "https://{}@github.com/{}",
-        github_token,
-        https_url.trim_start_matches("https://github.com/")
-    );
-
-    println!("   🔐 Pushing with GitHub token authentication...");
-
-    // Push with authentication
-    let ok = Command::new("git")
-        .args(["push", &auth_url])
-        .current_dir(root)
-        .env("GIT_TERMINAL_PROMPT", "0") // Disable interactive prompts
-        .status()?
-        .success();
-
-    if !ok {
-        println!("   ⚠️  Authenticated push failed, trying regular push...");
-        return git_push(root);
-    }
-
-    println!("   ✅ Successfully pushed with GitHub token");
-    Ok(())
-}
-
 fn git_add_all(root: &Path) -> Result<()> {
     let ok = Command::new("git")
         .args(["add", "-A"])
@@ -1703,7 +1454,6 @@ fn ensure_command_exists(name: &str) -> Result<()> {
         .with_context(|| format!("Command `{name}` not found in PATH"))
 }
 
-/// Detect if we're running in a Shuttle environment
 /// Parse the JSON response from the LLM to extract patch sets.
 fn parse_patches(raw: &str) -> Result<Vec<PatchSet>> {
     // Find JSON in the response (model might include explanations)
