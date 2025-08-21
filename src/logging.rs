@@ -101,12 +101,14 @@ impl FileLogger {
     }
     
     /// Log patch application details
+    #[allow(dead_code)]
     pub async fn patch_applied(&self, patch_title: &str, file_count: usize, success: bool) -> Result<()> {
         let status = if success { "✅" } else { "❌" };
         self.log(&format!("{} PATCH: '{}' affecting {} files", status, patch_title, file_count)).await
     }
     
     /// Log git operations
+    #[allow(dead_code)]
     pub async fn git_operation(&self, operation: &str, branch: Option<&str>, success: bool) -> Result<()> {
         let status = if success { "✅" } else { "❌" };
         let branch_info = branch.map(|b| format!(" [{}]", b)).unwrap_or_default();
@@ -123,6 +125,7 @@ impl FileLogger {
 pub struct LoggingConfig {
     pub console_level: log::LevelFilter,
     pub file_enabled: bool,
+    #[allow(dead_code)]
     pub structured_output: bool,
 }
 
@@ -212,6 +215,7 @@ impl OperationLogger {
         }
     }
     
+    #[allow(dead_code)]
     pub async fn log(&self, message: &str) {
         if let Some(ref logger) = self.file_logger {
             let _ = logger.log(&format!("[{}] {}", self.operation, message)).await;

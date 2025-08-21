@@ -107,6 +107,7 @@ impl PrManager {
     }
 
     /// Analyze existing codebase to suggest PR opportunities
+    #[allow(dead_code)]
     pub async fn suggest_pr_opportunities(&self, repo_path: &str) -> Result<Vec<PrOpportunity>> {
         let analysis = self.analyze_repository(repo_path).await?;
         let opportunities = self.identify_opportunities(&analysis).await?;
@@ -115,6 +116,7 @@ impl PrManager {
     }
 
     /// Validate PR against repository standards
+    #[allow(dead_code)]
     pub async fn validate_pr(&self, request: &PrRequest) -> Result<ValidationResult> {
         let mut issues = Vec::new();
 
