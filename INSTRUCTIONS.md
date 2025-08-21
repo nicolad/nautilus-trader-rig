@@ -1,16 +1,19 @@
 # Nautilus Trader Code Analysis & Pattern Compliance
 
 ## Objective
-Analyze the latest 100 commits from https://github.com/nautechsystems/nautilus_trader to identify and fix code that doesn't follow established patterns.
+
+Analyze the latest 100 commits from <https://github.com/nautechsystems/nautilus_trader> to identify and fix code that doesn't follow established patterns.
 
 ## Commit Pattern Analysis
 
 Based on analysis of the latest 100 commits, here are the established patterns:
 
 ### 1. Commit Message Patterns
+
 **Standard Format**: `<Action> <Component/Area> <description>`
 
 **Common Actions**:
+
 - `Fix` - Bug fixes and corrections
 - `Add` - New features or functionality  
 - `Improve` - Enhancements to existing code
@@ -25,6 +28,7 @@ Based on analysis of the latest 100 commits, here are the established patterns:
 - `Enhance` - Significant improvements
 
 **Component/Area Examples**:
+
 - Adapter names: `BitMEX`, `Bybit`, `OKX`, `Interactive Brokers`, `Databento`
 - System areas: `book subscription`, `execution`, `reconciliation`, `logging`
 - Data types: `FundingRateUpdate`, `OrderRejected`, `ExecutionReport`
@@ -33,16 +37,19 @@ Based on analysis of the latest 100 commits, here are the established patterns:
 ### 2. Code Quality Patterns
 
 **Naming Conventions**:
+
 - Method names use snake_case: `subscribe_bars`, `get_start_time`
 - Clear, descriptive names: `TimeBarAggregator`, `RetryManager`
 - Standardized suffixes: `_params`, `_config`, `_client`
 
 **Error Handling**:
+
 - Specific error messages with actual values
 - Proper validation with meaningful feedback
 - Race condition prevention in async code
 
 **Documentation**:
+
 - Standardized crate READMEs
 - Headers standardization
 - Comprehensive developer guides
@@ -50,16 +57,19 @@ Based on analysis of the latest 100 commits, here are the established patterns:
 ### 3. Architecture Patterns
 
 **Subscription Handling**:
+
 - Standardized book subscription method naming
 - Proper data type usage for book subscriptions
 - Consolidated subscription handlers
 
 **Adapter Patterns**:
+
 - Consistent disconnect sequences
 - Standardized websocket close handling
 - Proper client patterns across adapters
 
 **Testing Patterns**:
+
 - Tests for pyo3 conversions
 - Live reconciliation tests
 - Comprehensive test coverage for new features
@@ -67,19 +77,24 @@ Based on analysis of the latest 100 commits, here are the established patterns:
 ## Pattern Violations to Look For
 
 ### 1. Commit Message Violations
+
 ❌ **Bad Examples**:
+
 - Vague: "fix stuff", "update code"
 - No component: "Fix bug in trading"
 - Inconsistent casing: "fix BitMex adapter"
 - Too long or unclear
 
 ✅ **Good Examples**:
+
 - "Fix Bybit maker rebate fee signs"
 - "Standardize crate READMEs"
 - "Add support for execution of option spreads in backtesting"
 
 ### 2. Code Pattern Violations
+
 ❌ **Look for**:
+
 - Inconsistent naming conventions (camelCase in Rust, etc.)
 - Missing error handling or generic error messages
 - Redundant code that should be consolidated
@@ -89,6 +104,7 @@ Based on analysis of the latest 100 commits, here are the established patterns:
 - Non-standardized log message formatting
 
 ✅ **Fix by**:
+
 - Standardizing naming to match existing patterns
 - Adding specific error messages with context
 - Consolidating duplicate functionality
@@ -98,7 +114,9 @@ Based on analysis of the latest 100 commits, here are the established patterns:
 - Consistent log formatting
 
 ### 3. Architecture Violations
+
 ❌ **Antipatterns**:
+
 - Direct access instead of using proper subscription methods
 - Inconsistent data type usage
 - Missing validation

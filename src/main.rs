@@ -1,11 +1,46 @@
 // src/main.rs
 //
-// Self-improving Rust autopatcher with streaming support that:
-// - uses rig + DeepSeek to propose tiny code edits (incl. tiny deterministic tests),
-// - provides real-time streaming feedback during LLM generation,
-// - evaluates candidates in parallel in temp copies,
-// - applies a candidate to the real repo and commits ONLY if `cargo check` AND `cargo test` pass,
-// - avoids file corruption with transactional, atomic writes + backups + rollback.
+// Nautilus Trader Pattern Analysis & Code Quality Autopatcher
+//
+// This tool analyzes the latest 100 commits from https://github.com/nautechsystems/nautilus_trader
+// to identify and fix code that doesn't follow established patterns.
+//
+// OBJECTIVE: 
+// Analyze commits to identify established patterns and find violations
+//
+// ESTABLISHED PATTERNS (from analysis of latest 100 commits):
+//
+// 1. COMMIT MESSAGE PATTERNS:
+//    Format: <Action> <Component/Area> <description>
+//    Actions: Fix, Add, Improve, Refine, Standardize, Remove, Update, Implement, Continue, Introduce, Consolidate, Enhance
+//    Components: BitMEX, Bybit, OKX, Interactive Brokers, Databento, book subscription, execution, reconciliation, logging
+//
+// 2. CODE QUALITY PATTERNS:
+//    - Method names use snake_case: subscribe_bars, get_start_time
+//    - Clear, descriptive names: TimeBarAggregator, RetryManager
+//    - Standardized suffixes: _params, _config, _client
+//    - Specific error messages with actual values
+//    - Proper validation with meaningful feedback
+//    - Race condition prevention in async code
+//
+// 3. ARCHITECTURE PATTERNS:
+//    - Standardized book subscription method naming
+//    - Proper data type usage for book subscriptions
+//    - Consolidated subscription handlers
+//    - Consistent disconnect sequences
+//    - Standardized websocket close handling
+//    - Proper client patterns across adapters
+//
+// PATTERN VIOLATIONS TO DETECT:
+// ❌ Commit Messages: Vague messages, no component, inconsistent casing, too long
+// ❌ Code: Inconsistent naming, missing error handling, redundant code, missing tests, race conditions
+// ❌ Architecture: Direct access vs proper subscriptions, inconsistent data types, missing validation
+//
+// ACTIONS:
+// 1. Clone https://github.com/nautechsystems/nautilus_trader
+// 2. Analyze recent commits and code for pattern violations
+// 3. Create focused patches that follow established patterns
+// 4. Git push changes following commit message patterns
 
 use anyhow::{anyhow, Context, Result};
 use chrono::Utc;
@@ -155,8 +190,349 @@ async fn run_autopatcher_job() {
     println!("🔄 Autopatcher job cycle completed at: {:?}", Utc::now());
 }
 
+/// Clone Nautilus Trader repository for analysis
+async fn clone_nautilus_trader() -> Result<PathBuf> {
+    let repo_path = Path::new("./nautilus_trader");
+    
+    // Remove existing clone if it exists
+    if repo_path.exists() {
+        println!("🗑️  Removing existing nautilus_trader clone...");
+        fs::remove_dir_all(repo_path)?;
+    }
+    
+    println!("📥 Cloning https://github.com/nautechsystems/nautilus_trader...");
+    let output = Command::new("git")
+        .args([
+            "clone", 
+            "https://github.com/nautechsystems/nautilus_trader.git",
+            "nautilus_trader"
+        ])
+        .output()?;
+    
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(anyhow!("Failed to clone repository: {}", stderr));
+    }
+    
+    println!("✅ Repository cloned successfully");
+    Ok(repo_path.to_path_buf())
+}
+
+/// Analyze the latest 100 commits for pattern compliance
+async fn analyze_commit_patterns(repo_path: &Path) -> Result<Vec<String>> {
+    println!("📊 Analyzing latest 100 commits for pattern violations...");
+    
+    // Get commit messages
+    let output = Command::new("git")
+        .args(["log", "--oneline", "-100"])
+        .current_dir(repo_path)
+        .output()?;
+    
+    if !output.status.success() {
+        return Err(anyhow!("Failed to get git log"));
+    }
+    
+    let commits = String::from_utf8_lossy(&output.stdout);
+    let mut violations = Vec::new();
+    
+    // Define expected patterns
+    let valid_actions = [
+        "Fix", "Add", "Improve", "Refine", "Standardize", "Remove", 
+        "Update", "Implement", "Continue", "Introduce", "Consolidate", "Enhance"
+    ];
+    
+    let common_components = [
+        "BitMEX", "Bybit", "OKX", "Interactive Brokers", "Databento",
+        "book subscription", "execution", "reconciliation", "logging",
+        "dependencies", "Docker", "build", "adapter", "client"
+    ];
+    
+    println!("🔍 Checking {} commits against established patterns...", commits.lines().count());
+    
+    for (i, line) in commits.lines().enumerate() {
+        if let Some((_hash, message)) = line.split_once(' ') {
+            let message = message.trim();
+            
+            // Check for pattern violations
+            let mut commit_violations = Vec::new();
+            
+            // 1. Check if message starts with valid action
+            let starts_with_valid_action = valid_actions.iter()
+                .any(|action| message.starts_with(action));
+            
+            if !starts_with_valid_action {
+                commit_violations.push(format!("❌ No valid action verb: '{}'", message));
+            }
+            
+            // 2. Check for vague messages
+            let vague_patterns = ["fix stuff", "update code", "changes", "misc", "tmp", "wip"];
+            if vague_patterns.iter().any(|pattern| message.to_lowercase().contains(pattern)) {
+                commit_violations.push(format!("❌ Vague message: '{}'", message));
+            }
+            
+            // 3. Check message length (too short or too long)
+            if message.len() < 10 {
+                commit_violations.push(format!("❌ Message too short: '{}'", message));
+            } else if message.len() > 100 {
+                commit_violations.push(format!("❌ Message too long: '{}'", message));
+            }
+            
+            // 4. Check for proper component mention
+            let has_component = common_components.iter()
+                .any(|comp| message.contains(comp)) || 
+                message.contains("crate") || 
+                message.contains("test") ||
+                message.contains("doc");
+            
+            if !has_component && !message.starts_with("Update dependencies") {
+                commit_violations.push(format!("❌ No clear component mentioned: '{}'", message));
+            }
+            
+            if !commit_violations.is_empty() {
+                violations.push(format!("Commit #{}: {}", i + 1, commit_violations.join(", ")));
+            }
+        }
+    }
+    
+    if violations.is_empty() {
+        println!("✅ All commits follow established patterns!");
+    } else {
+        println!("⚠️  Found {} commits with pattern violations:", violations.len());
+        for violation in &violations {
+            println!("   {}", violation);
+        }
+    }
+    
+    Ok(violations)
+}
+
+/// Analyze code patterns in the repository
+async fn analyze_code_patterns(repo_path: &Path) -> Result<Vec<String>> {
+    println!("🔍 Analyzing code patterns...");
+    
+    let mut violations = Vec::new();
+    
+    // Look for common pattern violations in Rust files
+    for entry in WalkDir::new(repo_path)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .filter(|e| {
+            e.path().extension() == Some(OsStr::new("rs")) &&
+            !e.path().to_string_lossy().contains("target/") &&
+            !e.path().to_string_lossy().contains(".git/")
+        })
+    {
+        let file_path = entry.path();
+        if let Ok(content) = fs::read_to_string(file_path) {
+            let relative_path = file_path.strip_prefix(repo_path)
+                .unwrap_or(file_path)
+                .to_string_lossy();
+            
+            // Check for pattern violations
+            let lines: Vec<&str> = content.lines().collect();
+            
+            for (line_num, line) in lines.iter().enumerate() {
+                let line_trimmed = line.trim();
+                
+                // 1. Check for camelCase function names (should be snake_case)
+                if let Some(caps) = Regex::new(r"fn\s+([a-z][a-zA-Z]*[A-Z][a-zA-Z]*)\s*\(").unwrap().captures(line) {
+                    if let Some(func_name) = caps.get(1) {
+                        violations.push(format!("{}:{} - camelCase function name '{}' should be snake_case", 
+                            relative_path, line_num + 1, func_name.as_str()));
+                    }
+                }
+                
+                // 2. Check for generic error messages
+                if line_trimmed.contains("Error") && 
+                   (line_trimmed.contains("\"Error\"") || line_trimmed.contains("\"error\"")) {
+                    violations.push(format!("{}:{} - Generic error message, should be specific", 
+                        relative_path, line_num + 1));
+                }
+                
+                // 3. Check for TODO/FIXME without context
+                if line_trimmed.contains("TODO") || line_trimmed.contains("FIXME") {
+                    if !line_trimmed.contains(":") {
+                        violations.push(format!("{}:{} - TODO/FIXME without context or assignee", 
+                            relative_path, line_num + 1));
+                    }
+                }
+                
+                // 4. Check for unwrap() usage (should have proper error handling)
+                if line_trimmed.contains(".unwrap()") && !line_trimmed.contains("// SAFETY:") {
+                    violations.push(format!("{}:{} - unwrap() usage without safety comment", 
+                        relative_path, line_num + 1));
+                }
+            }
+        }
+    }
+    
+    if violations.is_empty() {
+        println!("✅ No code pattern violations found!");
+    } else {
+        println!("⚠️  Found {} code pattern violations:", violations.len());
+        for (i, violation) in violations.iter().enumerate() {
+            if i < 10 {  // Show first 10 violations
+                println!("   {}", violation);
+            }
+        }
+        if violations.len() > 10 {
+            println!("   ... and {} more violations", violations.len() - 10);
+        }
+    }
+    
+    Ok(violations)
+}
+
+/// Generate fixes for pattern violations using DeepSeek
+async fn generate_pattern_fixes(violations: &[String]) -> Result<Vec<PatchSet>> {
+    if violations.is_empty() {
+        return Ok(vec![]);
+    }
+    
+    println!("🤖 Generating fixes for pattern violations using DeepSeek...");
+    
+    let client = DeepSeekClient::from_env()?;
+    
+    let prompt = format!(
+        "You are a code quality expert for the Nautilus Trader project. Based on these pattern violations, generate specific fixes:
+
+VIOLATIONS FOUND:
+{}
+
+ESTABLISHED PATTERNS TO FOLLOW:
+- Commit messages: <Action> <Component> <description>
+- Function names: snake_case (not camelCase)
+- Error messages: specific with context, not generic
+- TODO/FIXME: include context and assignee
+- Error handling: avoid unwrap(), use proper Result handling
+
+Generate 1-3 small, focused patches that fix these violations while following the established patterns.
+Focus on the most critical violations first.
+
+Return a JSON response with patches array.",
+        violations.iter().take(10).cloned().collect::<Vec<_>>().join("\n")
+    );
+    
+    let response = client.stream_prompt(&prompt).await?;
+    let patches = parse_patches(&response)?;
+    
+    println!("✅ Generated {} fixes for pattern violations", patches.len());
+    Ok(patches)
+}
+
+/// Push changes to git repository with proper commit message
+async fn git_push_pattern_fixes(repo_path: &Path, patches: &[PatchSet]) -> Result<()> {
+    if patches.is_empty() {
+        println!("ℹ️  No patches to push");
+        return Ok(());
+    }
+    
+    println!("📤 Pushing pattern compliance fixes...");
+    
+    // Add all changes
+    let output = Command::new("git")
+        .args(["add", "-A"])
+        .current_dir(repo_path)
+        .output()?;
+    
+    if !output.status.success() {
+        return Err(anyhow!("Failed to git add"));
+    }
+    
+    // Create commit message following the established pattern
+    let commit_msg = if patches.len() == 1 {
+        format!("Standardize code patterns - {}", patches[0].title)
+    } else {
+        format!("Standardize code patterns across {} areas\n\n{}", 
+            patches.len(),
+            patches.iter().map(|p| format!("- {}", p.title)).collect::<Vec<_>>().join("\n")
+        )
+    };
+    
+    // Commit changes
+    let output = Command::new("git")
+        .args(["commit", "-m", &commit_msg])
+        .current_dir(repo_path)
+        .output()?;
+    
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        if stderr.contains("nothing to commit") {
+            println!("ℹ️  No changes to commit");
+            return Ok(());
+        }
+        return Err(anyhow!("Failed to commit: {}", stderr));
+    }
+    
+    // Push to remote
+    let output = Command::new("git")
+        .args(["push", "origin", "HEAD"])
+        .current_dir(repo_path)
+        .output()?;
+    
+    if output.status.success() {
+        println!("✅ Successfully pushed pattern compliance fixes");
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        println!("⚠️  Push failed (this is expected for read-only clone): {}", stderr);
+        println!("ℹ️  Changes are committed locally and ready for manual push");
+    }
+    
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
+    // Load environment variables from .env file if present
+    let _ = dotenv();
+    
+    println!("🎯 Starting Nautilus Trader Pattern Analysis Autopatcher...");
+    println!("📋 Objective: Analyze commits and fix pattern violations in nautilus_trader");
+
+    // Step 1: Clone Nautilus Trader repository
+    let repo_path = clone_nautilus_trader().await?;
+    
+    // Step 2: Analyze commit patterns
+    let commit_violations = analyze_commit_patterns(&repo_path).await?;
+    
+    // Step 3: Analyze code patterns  
+    let code_violations = analyze_code_patterns(&repo_path).await?;
+    
+    // Combine all violations
+    let mut all_violations = commit_violations;
+    all_violations.extend(code_violations);
+    
+    if all_violations.is_empty() {
+        println!("🎉 No pattern violations found! The codebase follows established patterns.");
+        return Ok(());
+    }
+    
+    // Step 4: Generate fixes for violations
+    let patches = generate_pattern_fixes(&all_violations).await?;
+    
+    // Step 5: Apply fixes and push if valid
+    if !patches.is_empty() {
+        println!("🔧 Applying {} pattern compliance fixes...", patches.len());
+        
+        // Apply patches to the cloned repository
+        for patch in &patches {
+            println!("   📝 Applying: {}", patch.title);
+            if let Err(e) = apply_patchset_atomic_only(&repo_path, patch) {
+                println!("   ⚠️  Failed to apply patch '{}': {}", patch.title, e);
+            }
+        }
+        
+        // Push the fixes
+        git_push_pattern_fixes(&repo_path, &patches).await?;
+    }
+
+    println!("✅ Pattern analysis complete!");
+    Ok(())
+}
+
+// Alternative scheduling main function (commented out)
+/*
+async fn main_with_scheduling() -> Result<()> {
     // Load environment variables from .env file if present
     let _ = dotenv();
     
@@ -193,6 +569,7 @@ async fn main() -> Result<()> {
         run_autopatcher_job().await;
     }
 }
+*/
 
 async fn run_autopatcher() -> Result<()> {
     println!("📋 Starting run_autopatcher function...");
