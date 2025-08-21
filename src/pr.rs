@@ -3,19 +3,18 @@
 // Pull Request module for creating and managing PRs against nautilus_trader repository
 // Follows established commit patterns and contribution guidelines
 
+use crate::DeepSeekClient;
 use anyhow::{anyhow, Context, Result};
 use octocrab::Octocrab;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::process::Command;
-use crate::DeepSeekClient;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PrConfig {
-    pub base_repo: String,        // "nicolad/nautilus_trader"
-    pub fork_repo: String,        // User's fork
-    pub base_branch: String,      // "master" or "main"
-    pub work_branch: String,      // Feature branch name
+    pub base_repo: String,   // "nicolad/nautilus_trader"
+    pub fork_repo: String,   // User's fork
+    pub base_branch: String, // "master" or "main"
+    pub work_branch: String, // Feature branch name
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -72,7 +71,7 @@ impl PrManager {
         let github = Octocrab::builder()
             .personal_token(github_token.to_string())
             .build()?;
-            
+
         Ok(Self {
             client,
             github,
@@ -84,21 +83,21 @@ impl PrManager {
     pub async fn create_pr(&self, mut request: PrRequest) -> Result<PrResult> {
         // Optimize the PR before creation
         request = self.optimize_pr(request).await?;
-        
+
         // Create branch and apply changes
         let branch_name = self.create_branch(&request).await?;
         self.apply_changes(&request.changes).await?;
-        
+
         // Generate commit message following nautilus_trader patterns
         let commit_msg = self.generate_commit_message(&request).await?;
         self.commit_changes(&commit_msg).await?;
-        
+
         // Push to fork
         self.push_branch(&branch_name).await?;
-        
+
         // Create GitHub PR
         let pr_url = self.create_github_pr(&request, &branch_name).await?;
-        
+
         Ok(PrResult {
             pr_url,
             branch_name,
@@ -111,31 +110,33 @@ impl PrManager {
     pub async fn suggest_pr_opportunities(&self, repo_path: &str) -> Result<Vec<PrOpportunity>> {
         let analysis = self.analyze_repository(repo_path).await?;
         let opportunities = self.identify_opportunities(&analysis).await?;
-        
+
         Ok(opportunities)
     }
 
     /// Validate PR against repository standards
     pub async fn validate_pr(&self, request: &PrRequest) -> Result<ValidationResult> {
         let mut issues = Vec::new();
-        
+
         // Check commit message format
         if !self.validate_title(&request.title) {
-            issues.push("Title doesn't follow pattern: <Action> <Component> <description>".to_string());
+            issues.push(
+                "Title doesn't follow pattern: <Action> <Component> <description>".to_string(),
+            );
         }
-        
+
         // Check file changes
         for change in &request.changes {
             if let Some(validation_issue) = self.validate_file_change(change).await? {
                 issues.push(validation_issue);
             }
         }
-        
+
         // Check description completeness
         if request.description.len() < 50 {
             issues.push("Description too short. Provide detailed explanation.".to_string());
         }
-        
+
         Ok(ValidationResult {
             is_valid: issues.is_empty(),
             issues: issues.clone(),
@@ -146,33 +147,36 @@ impl PrManager {
     async fn optimize_pr(&self, mut request: PrRequest) -> Result<PrRequest> {
         // Optimize title
         request.title = self.optimize_title(&request.title).await?;
-        
+
         // Enhance description
         request.description = self.enhance_description(&request).await?;
-        
+
         // Optimize file changes
         for change in &mut request.changes {
             if let Some(content) = &change.content {
                 change.content = Some(self.optimize_code(content).await?);
             }
         }
-        
+
         Ok(request)
     }
 
     async fn create_branch(&self, request: &PrRequest) -> Result<String> {
         let branch_name = self.generate_branch_name(request).await?;
-        
+
         // Create and checkout new branch
         let output = Command::new("git")
             .args(&["checkout", "-b", &branch_name])
             .output()
             .context("Failed to create git branch")?;
-            
+
         if !output.status.success() {
-            return Err(anyhow!("Failed to create branch: {}", String::from_utf8_lossy(&output.stderr)));
+            return Err(anyhow!(
+                "Failed to create branch: {}",
+                String::from_utf8_lossy(&output.stderr)
+            ));
         }
-        
+
         Ok(branch_name)
     }
 
@@ -203,10 +207,10 @@ impl PrManager {
             PrCategory::Documentation => "Update",
             PrCategory::Test => "Add",
         };
-        
+
         // Extract component from file paths
         let component = self.extract_component(&request.changes);
-        
+
         let prompt = format!(
             "Generate a commit message following nautilus_trader pattern: '{} {} <description>'
             
@@ -220,13 +224,16 @@ impl PrManager {
             - Refactor execution engine
             
             Keep it concise and specific.",
-            action, component,
-            request.changes.iter()
-                .map(|c| format!("- {:?}: {}", c.action, c.path))
+            action,
+            component,
+            request
+                .changes
+                .iter()
+                .map(|c| format!("- {}: {}", c.action, c.path))
                 .collect::<Vec<_>>()
                 .join("\n")
         );
-        
+
         let response = self.client.prompt(&prompt).await?;
         Ok(response.trim().to_string())
     }
@@ -237,17 +244,20 @@ impl PrManager {
             .args(&["add", "."])
             .output()
             .context("Failed to stage changes")?;
-            
+
         // Commit with message
         let output = Command::new("git")
             .args(&["commit", "-m", message])
             .output()
             .context("Failed to commit changes")?;
-            
+
         if !output.status.success() {
-            return Err(anyhow!("Failed to commit: {}", String::from_utf8_lossy(&output.stderr)));
+            return Err(anyhow!(
+                "Failed to commit: {}",
+                String::from_utf8_lossy(&output.stderr)
+            ));
         }
-        
+
         Ok(())
     }
 
@@ -256,11 +266,14 @@ impl PrManager {
             .args(&["push", "origin", branch_name])
             .output()
             .context("Failed to push branch")?;
-            
+
         if !output.status.success() {
-            return Err(anyhow!("Failed to push: {}", String::from_utf8_lossy(&output.stderr)));
+            return Err(anyhow!(
+                "Failed to push: {}",
+                String::from_utf8_lossy(&output.stderr)
+            ));
         }
-        
+
         Ok(())
     }
 
@@ -268,36 +281,46 @@ impl PrManager {
         let parts: Vec<&str> = self.config.base_repo.split('/').collect();
         let owner = parts[0];
         let repo = parts[1];
-        
-        let pr = self.github
+
+        let pr = self
+            .github
             .pulls(owner, repo)
-            .create(&request.title, &format!("{}:{}", owner, branch_name), &self.config.base_branch)
+            .create(
+                &request.title,
+                &format!("{}:{}", owner, branch_name),
+                &self.config.base_branch,
+            )
             .body(&request.description)
             .send()
             .await
             .context("Failed to create GitHub PR")?;
-            
+
         Ok(pr.html_url.unwrap().to_string())
     }
 
     fn validate_title(&self, title: &str) -> bool {
-        let pattern = regex::Regex::new(r"^(Fix|Add|Improve|Refine|Standardize|Remove|Update|Implement|Continue)\s+\w+\s+.+").unwrap();
+        let pattern = regex::Regex::new(
+            r"^(Fix|Add|Improve|Refine|Standardize|Remove|Update|Implement|Continue)\s+\w+\s+.+",
+        )
+        .unwrap();
         pattern.is_match(title)
     }
 
     async fn validate_file_change(&self, change: &FileChange) -> Result<Option<String>> {
         // Validate file patterns
-        if change.path.contains("test") && !matches!(change.action, ChangeAction::Create | ChangeAction::Modify) {
+        if change.path.contains("test")
+            && !matches!(change.action, ChangeAction::Create | ChangeAction::Modify)
+        {
             return Ok(Some("Avoid deleting test files".to_string()));
         }
-        
+
         // Validate Rust code if applicable
         if change.path.ends_with(".rs") {
             if let Some(content) = &change.content {
                 return self.validate_rust_code(content).await;
             }
         }
-        
+
         Ok(None)
     }
 
@@ -306,7 +329,7 @@ impl PrManager {
         if !code.contains("use ") && code.len() > 100 {
             return Ok(Some("Consider adding proper imports".to_string()));
         }
-        
+
         Ok(None)
     }
 
@@ -314,7 +337,7 @@ impl PrManager {
         if issues.is_empty() {
             return Ok(vec!["PR looks good!".to_string()]);
         }
-        
+
         let prompt = format!(
             "Generate suggestions to fix these PR issues:
             {}
@@ -322,7 +345,7 @@ impl PrManager {
             Focus on nautilus_trader contribution guidelines.",
             issues.join("\n- ")
         );
-        
+
         let response = self.client.prompt(&prompt).await?;
         Ok(response.lines().map(|s| s.trim().to_string()).collect())
     }
@@ -346,7 +369,7 @@ impl PrManager {
         if self.validate_title(title) {
             return Ok(title.to_string());
         }
-        
+
         let prompt = format!(
             "Optimize this title to follow nautilus_trader pattern '<Action> <Component> <description>':
             Original: {}
@@ -355,7 +378,7 @@ impl PrManager {
             Keep it concise and specific.",
             title
         );
-        
+
         let response = self.client.prompt(&prompt).await?;
         Ok(response.trim().to_string())
     }
@@ -364,7 +387,7 @@ impl PrManager {
         if request.description.len() > 200 {
             return Ok(request.description.clone());
         }
-        
+
         let prompt = format!(
             "Enhance this PR description for nautilus_trader:
             
@@ -383,7 +406,7 @@ impl PrManager {
             request.description,
             request.changes.len()
         );
-        
+
         let response = self.client.prompt(&prompt).await?;
         Ok(response.trim().to_string())
     }
@@ -402,25 +425,44 @@ impl PrManager {
             PrCategory::Documentation => "docs",
             PrCategory::Test => "test",
         };
-        
+
         let component = self.extract_component(&request.changes);
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)?
             .as_secs();
-            
-        Ok(format!("{}-{}-{}", category, component.to_lowercase(), timestamp))
+
+        Ok(format!(
+            "{}-{}-{}",
+            category,
+            component.to_lowercase(),
+            timestamp
+        ))
     }
 
     fn extract_component(&self, changes: &[FileChange]) -> String {
         // Extract component from file paths
         for change in changes {
-            if change.path.contains("bitmex") { return "bitmex".to_string(); }
-            if change.path.contains("bybit") { return "bybit".to_string(); }
-            if change.path.contains("okx") { return "okx".to_string(); }
-            if change.path.contains("adapter") { return "adapters".to_string(); }
-            if change.path.contains("execution") { return "execution".to_string(); }
-            if change.path.contains("backtest") { return "backtest".to_string(); }
-            if change.path.contains("live") { return "live".to_string(); }
+            if change.path.contains("bitmex") {
+                return "bitmex".to_string();
+            }
+            if change.path.contains("bybit") {
+                return "bybit".to_string();
+            }
+            if change.path.contains("okx") {
+                return "okx".to_string();
+            }
+            if change.path.contains("adapter") {
+                return "adapters".to_string();
+            }
+            if change.path.contains("execution") {
+                return "execution".to_string();
+            }
+            if change.path.contains("backtest") {
+                return "backtest".to_string();
+            }
+            if change.path.contains("live") {
+                return "live".to_string();
+            }
         }
         "core".to_string()
     }

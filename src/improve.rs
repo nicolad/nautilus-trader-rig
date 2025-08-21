@@ -3,12 +3,11 @@
 // Self-improvement module for analyzing and enhancing code quality
 // Based on established patterns from nautilus_trader repository
 
-use anyhow::{anyhow, Context, Result};
-use rig::prelude::*;
+use crate::{DeepSeekClient, logging::FileLogger};
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::path::PathBuf;
-use crate::DeepSeekClient;
+use std::time::Instant;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CodeAnalysis {
@@ -70,6 +69,7 @@ pub enum Effort {
 pub struct Improver {
     client: DeepSeekClient,
     patterns: PatternDatabase,
+    logger: FileLogger,
 }
 
 pub struct PatternDatabase {
@@ -79,15 +79,21 @@ pub struct PatternDatabase {
 }
 
 impl Improver {
-    pub fn new(client: DeepSeekClient) -> Self {
+    pub fn new(client: DeepSeekClient, logger: FileLogger) -> Self {
         Self {
             client,
             patterns: PatternDatabase::default(),
+            logger,
         }
     }
 
     /// Analyze code quality and suggest improvements
     pub async fn analyze_code(&self, file_path: &str, content: &str) -> Result<CodeAnalysis> {
+        let start_time = Instant::now();
+        
+        self.logger.operation_start("CODE_ANALYSIS", &format!("Analyzing file: {}", file_path)).await?;
+        self.logger.debug(&format!("File content length: {} chars", content.len())).await?;
+        
         let prompt = format!(
             r#"Analyze this Rust code for quality issues and improvements:
 
@@ -109,45 +115,98 @@ Return analysis as JSON with issues and improvements."#,
             file_path, content
         );
 
+        self.logger.debug(&format!("Sending analysis prompt: {} chars", prompt.len())).await?;
+        let ai_start = Instant::now();
         let response = self.client.prompt(&prompt).await?;
+        let ai_duration = ai_start.elapsed().as_millis() as u64;
         
+        self.logger.ai_interaction("Code-Analyzer", prompt.len(), response.len(), ai_duration).await?;
+
         // Parse response and extract analysis
-        self.parse_analysis_response(&response, file_path)
+        let analysis = self.parse_analysis_response(&response, file_path)?;
+        
+        let duration = start_time.elapsed().as_millis() as u64;
+        let issue_count = analysis.issues.len();
+        let improvement_count = analysis.improvements.len();
+        
+        self.logger.operation_complete("CODE_ANALYSIS", duration, true).await?;
+        self.logger.info(&format!(
+            "Analysis complete for {}: {} issues, {} improvements, score: {:.1}",
+            file_path, issue_count, improvement_count, analysis.score
+        )).await?;
+        
+        // Log detailed findings
+        for issue in &analysis.issues {
+            self.logger.debug(&format!(
+                "Issue found: {:?} severity {:?} at line {:?}: {}",
+                issue.category, issue.severity, issue.line, issue.description
+            )).await?;
+        }
+        
+        Ok(analysis)
     }
 
     /// Generate improvement plan for codebase
-    pub async fn create_improvement_plan(&self, analyses: &[CodeAnalysis]) -> Result<ImprovementPlan> {
+    pub async fn create_improvement_plan(
+        &self,
+        analyses: &[CodeAnalysis],
+    ) -> Result<ImprovementPlan> {
+        let start_time = Instant::now();
+        
+        self.logger.operation_start("IMPROVEMENT_PLAN", &format!("Creating plan for {} files", analyses.len())).await?;
+        
         let total_issues = analyses.iter().map(|a| a.issues.len()).sum::<usize>();
         let avg_score = analyses.iter().map(|a| a.score).sum::<f64>() / analyses.len() as f64;
 
+        self.logger.info(&format!("Total issues across codebase: {}", total_issues)).await?;
+        self.logger.info(&format!("Average code quality score: {:.2}", avg_score)).await?;
+
         let priorities = self.prioritize_improvements(analyses);
+        let timeline = self.estimate_timeline(&priorities);
         
+        self.logger.info(&format!(
+            "Timeline: {} immediate, {} short-term, {} medium-term",
+            timeline.immediate, timeline.short_term, timeline.medium_term
+        )).await?;
+        
+        // Log top priority issues
+        for (i, priority) in priorities.iter().take(5).enumerate() {
+            self.logger.debug(&format!(
+                "Priority #{}: {} (score: {:.2}) - {:?} in {}",
+                i + 1, priority.issue.description, priority.priority_score,
+                priority.issue.severity, priority.file
+            )).await?;
+        }
+        
+        let duration = start_time.elapsed().as_millis() as u64;
+        self.logger.operation_complete("IMPROVEMENT_PLAN", duration, true).await?;
+
         Ok(ImprovementPlan {
             total_files: analyses.len(),
             total_issues,
             average_score: avg_score,
             priorities: priorities.clone(),
-            timeline: self.estimate_timeline(&priorities),
+            timeline,
         })
     }
 
     /// Apply automated fixes to code
     pub async fn apply_fixes(&self, analysis: &CodeAnalysis, content: &str) -> Result<String> {
         let mut fixed_content = content.to_string();
-        
+
         for issue in &analysis.issues {
             if self.can_auto_fix(issue) {
                 fixed_content = self.apply_fix(&fixed_content, issue).await?;
             }
         }
-        
+
         Ok(fixed_content)
     }
 
     fn parse_analysis_response(&self, _response: &str, file_path: &str) -> Result<CodeAnalysis> {
         // Implementation to parse AI response into structured analysis
         // This would parse JSON response from the AI model
-        
+
         Ok(CodeAnalysis {
             file_path: file_path.to_string(),
             issues: vec![],
@@ -158,7 +217,7 @@ Return analysis as JSON with issues and improvements."#,
 
     fn prioritize_improvements(&self, analyses: &[CodeAnalysis]) -> Vec<PriorityItem> {
         let mut priorities = Vec::new();
-        
+
         for analysis in analyses {
             for issue in &analysis.issues {
                 let priority_score = self.calculate_priority_score(issue);
@@ -169,7 +228,7 @@ Return analysis as JSON with issues and improvements."#,
                 });
             }
         }
-        
+
         priorities.sort_by(|a, b| b.priority_score.partial_cmp(&a.priority_score).unwrap());
         priorities
     }
@@ -181,14 +240,14 @@ Return analysis as JSON with issues and improvements."#,
             Severity::Medium => 2.0,
             Severity::Low => 1.0,
         };
-        
+
         let category_weight = match issue.category {
             IssueCategory::ErrorHandling => 1.5,
             IssueCategory::Performance => 1.3,
             IssueCategory::Architecture => 1.2,
             _ => 1.0,
         };
-        
+
         severity_weight * category_weight
     }
 
@@ -206,9 +265,15 @@ Return analysis as JSON with issues and improvements."#,
     }
 
     fn estimate_timeline(&self, priorities: &[PriorityItem]) -> Timeline {
-        let critical_count = priorities.iter().filter(|p| matches!(p.issue.severity, Severity::Critical)).count();
-        let high_count = priorities.iter().filter(|p| matches!(p.issue.severity, Severity::High)).count();
-        
+        let critical_count = priorities
+            .iter()
+            .filter(|p| matches!(p.issue.severity, Severity::Critical))
+            .count();
+        let high_count = priorities
+            .iter()
+            .filter(|p| matches!(p.issue.severity, Severity::High))
+            .count();
+
         Timeline {
             immediate: critical_count,
             short_term: high_count,
@@ -235,9 +300,9 @@ pub struct PriorityItem {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Timeline {
-    pub immediate: usize,    // Critical issues (0-1 week)
-    pub short_term: usize,   // High priority (1-4 weeks)
-    pub medium_term: usize,  // Medium/Low priority (1-3 months)
+    pub immediate: usize,   // Critical issues (0-1 week)
+    pub short_term: usize,  // High priority (1-4 weeks)
+    pub medium_term: usize, // Medium/Low priority (1-3 months)
 }
 
 impl Default for PatternDatabase {
@@ -246,19 +311,19 @@ impl Default for PatternDatabase {
         naming_patterns.insert("function".to_string(), "snake_case".to_string());
         naming_patterns.insert("variable".to_string(), "snake_case".to_string());
         naming_patterns.insert("struct".to_string(), "PascalCase".to_string());
-        
+
         let error_patterns = vec![
             "provide specific error context".to_string(),
             "use anyhow::Context for error chaining".to_string(),
             "avoid generic error messages".to_string(),
         ];
-        
+
         let architecture_patterns = vec![
             "use standardized subscription methods".to_string(),
             "implement consistent disconnect sequences".to_string(),
             "follow adapter pattern for integrations".to_string(),
         ];
-        
+
         Self {
             naming_patterns,
             error_patterns,
