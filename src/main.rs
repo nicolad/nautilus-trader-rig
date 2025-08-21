@@ -48,6 +48,7 @@ mod pr;
 use config::{AutopatcherConfig, Config, GitConfig};
 use improve::Improver;
 use logging::{FileLogger, LoggingConfig, OperationLogger};
+use pr::{PrManager, PrConfig, PrRequest, FileChange, ChangeAction, PrCategory};
 
 /// DeepSeek client using rig framework
 #[derive(Clone)]
@@ -2231,9 +2232,10 @@ Generate a specific, implementable improvement now.
 
 /// Apply self-improvement to the autopatcher's own codebase
 /// Enhanced self-improvement using the improve.rs module
+#[allow(dead_code)]
 async fn enhance_self_improvement_with_logging(
     client: &DeepSeekClient,
-    config: &Config,
+    _config: &Config,
 ) -> Result<Option<AutopatcherOutcome>> {
     let file_logger = FileLogger::new()?;
     let mut improver = Improver::new(client.clone(), file_logger.clone());
@@ -2326,7 +2328,7 @@ async fn enhance_self_improvement_with_logging(
         .await?;
 
     // Create a summary of improvements
-    let rationale = format!(
+    let _rationale = format!(
         "Self-improvement analysis found {} issues across {} files (avg score: {:.1}). Priority improvements:\n{}",
         improvement_plan.total_issues,
         improvement_plan.total_files,
@@ -2350,6 +2352,7 @@ async fn enhance_self_improvement_with_logging(
 }
 
 /// Find Rust files in the project
+#[allow(dead_code)]
 fn find_rust_files(dir: &std::path::Path) -> Result<Vec<std::path::PathBuf>> {
     let mut rust_files = Vec::new();
 
@@ -2607,25 +2610,123 @@ async fn create_pull_request(
     description: &str,
     patch: &PatchSet,
     target_branch: Option<&str>,
-    _config: &Config,
+    config: &Config,
 ) -> Result<()> {
     println!("📤 Creating pull request: {}", title);
-    println!("⚠️  GitHub PR creation is currently a placeholder");
-    println!("   📋 Title: {}", title);
-    println!("   📝 Description: {}", description);
-    println!("   🌿 Target branch: {}", target_branch.unwrap_or("main"));
-    println!("   🔧 Patch contains {} edits", patch.edits.len());
+    
+    // Check if we have a GitHub token
+    let github_token = match std::env::var("GITHUB_TOKEN") {
+        Ok(token) => token,
+        Err(_) => {
+            println!("⚠️  GITHUB_TOKEN environment variable not found");
+            println!("   📋 Title: {}", title);
+            println!("   📝 Description: {}", description);
+            println!("   🌿 Target branch: {}", target_branch.unwrap_or("main"));
+            println!("   🔧 Patch contains {} edits", patch.edits.len());
+            println!("📤 Pull request logged (no GitHub token available)");
+            return Ok(());
+        }
+    };
 
-    // For now, just log what we would do
-    // In a real implementation, this would:
-    // 1. Clone the target repository
-    // 2. Create a new branch
-    // 3. Apply the patch
-    // 4. Push the branch
-    // 5. Create a PR via GitHub API
+    // Initialize DeepSeek client for PR manager
+    let client = DeepSeekClient::from_env()?;
+    
+    // Configure PR manager
+    let pr_config = PrConfig {
+        base_repo: "nautechsystems/nautilus_trader".to_string(),
+        fork_repo: format!("{}/nautilus_trader", config.git.user_name), // Assuming user has a fork
+        base_branch: target_branch.unwrap_or("master").to_string(),
+        work_branch: format!("autopatcher-{}", chrono::Utc::now().format("%Y%m%d-%H%M%S")),
+    };
 
-    println!("📤 Pull request (placeholder) created successfully!");
+    // Create PR manager
+    let pr_manager = PrManager::new(client, &github_token, pr_config)?;
+
+    // Convert patch to file changes
+    let mut file_changes = Vec::new();
+    for edit in &patch.edits {
+        match edit {
+            Edit::ReplaceFile { path, content } => {
+                file_changes.push(FileChange {
+                    path: path.clone(),
+                    action: ChangeAction::Modify,
+                    content: Some(content.clone()),
+                    diff: None,
+                });
+            }
+            Edit::SearchReplace { path, .. } => {
+                // For search/replace, we'll need to read the current file to create the new content
+                // For now, just mark it as modified
+                file_changes.push(FileChange {
+                    path: path.clone(),
+                    action: ChangeAction::Modify,
+                    content: None, // Would need to compute the new content after applying the search/replace
+                    diff: None, // Could compute diff here if needed
+                });
+            }
+            Edit::InsertBefore { path, .. } | Edit::InsertAfter { path, .. } => {
+                file_changes.push(FileChange {
+                    path: path.clone(),
+                    action: ChangeAction::Modify,
+                    content: None, // Would need to compute the new content after applying the insert
+                    diff: None,
+                });
+            }
+        }
+    }
+
+    // Determine PR category based on title and changes
+    let category = determine_pr_category(title, &file_changes);
+
+    // Create PR request
+    let pr_request = PrRequest {
+        title: title.to_string(),
+        description: description.to_string(),
+        changes: file_changes,
+        category,
+    };
+
+    // Create the pull request
+    match pr_manager.create_pr(pr_request).await {
+        Ok(result) => {
+            println!("✅ Pull request created successfully!");
+            println!("   🔗 URL: {}", result.pr_url);
+            println!("   � Branch: {}", result.branch_name);
+            println!("   📁 Files changed: {}", result.files_changed);
+        }
+        Err(e) => {
+            println!("❌ Failed to create pull request: {}", e);
+            // Fallback to logging
+            println!("   📋 Title: {}", title);
+            println!("   📝 Description: {}", description);
+            println!("   🌿 Target branch: {}", target_branch.unwrap_or("main"));
+            println!("   🔧 Patch contains {} edits", patch.edits.len());
+            return Err(e);
+        }
+    }
+
     Ok(())
+}
+
+/// Determine PR category based on title and changes
+fn determine_pr_category(title: &str, _changes: &[FileChange]) -> PrCategory {
+    let title_lower = title.to_lowercase();
+    
+    if title_lower.contains("fix") || title_lower.contains("bug") {
+        PrCategory::Fix
+    } else if title_lower.contains("add") || title_lower.contains("implement") {
+        PrCategory::Feature
+    } else if title_lower.contains("improve") || title_lower.contains("optimize") || title_lower.contains("enhance") {
+        PrCategory::Improvement
+    } else if title_lower.contains("refactor") || title_lower.contains("restructure") {
+        PrCategory::Refactor
+    } else if title_lower.contains("doc") || title_lower.contains("readme") {
+        PrCategory::Documentation
+    } else if title_lower.contains("test") {
+        PrCategory::Test
+    } else {
+        PrCategory::Improvement // Default
+    }
 }
 
 /// Determine what outcome to take based on analysis

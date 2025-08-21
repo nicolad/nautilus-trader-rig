@@ -69,14 +69,18 @@ pub enum Effort {
 
 pub struct Improver {
     client: DeepSeekClient,
+    #[allow(dead_code)]
     patterns: PatternDatabase,
     logger: FileLogger,
     recent_commits: HashSet<String>,
 }
 
 pub struct PatternDatabase {
+    #[allow(dead_code)]
     pub naming_patterns: HashMap<String, String>,
+    #[allow(dead_code)]
     pub error_patterns: Vec<String>,
+    #[allow(dead_code)]
     pub architecture_patterns: Vec<String>,
 }
 
