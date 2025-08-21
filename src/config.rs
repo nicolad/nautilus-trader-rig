@@ -1,7 +1,11 @@
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
+use std::path::PathBimpl Default for AutopatcherConfig {
+    fn default() -> Self {
+        Self {
+            model: "deepseek-chat".to_string(),
+            max_tokens: 8192,
+            temperature: 0.3,
+            max_iterations: 1000, // Increased to allow much longer runsderive(Debug, Clone, Serialize, Deserialize)]
 pub struct CronConfig {
     /// Cron schedule expression (e.g., "0 */5 * * * *" for every 5 minutes)
     pub schedule: String,

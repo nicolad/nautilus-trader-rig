@@ -818,9 +818,9 @@ Input:
 
         let parsed = parse_patches(&raw)?;
         if parsed.is_empty() {
-            println!("❌ Model returned no patches; stopping iteration");
-            log::warn!("AI returned no patches for iteration {}", iter);
-            break;
+            println!("⚠️ Model returned no patches; continuing to next iteration");
+            log::warn!("AI returned no patches for iteration {} - continuing", iter);
+            continue; // Continue instead of breaking
         }
 
         println!("   ✅ Found {} patch proposals:", parsed.len());
@@ -1082,16 +1082,16 @@ Input:
 
             let iter_duration = chrono::Utc::now() - iter_start_time;
             println!(
-                "❌ Iteration {} failed in {}ms - stopping",
+                "⚠️ Iteration {} failed in {}ms - continuing to next iteration",
                 iter,
                 iter_duration.num_milliseconds()
             );
             log::warn!(
-                "Iteration {} failed in {}ms",
+                "Iteration {} failed in {}ms - continuing",
                 iter,
                 iter_duration.num_milliseconds()
             );
-            break;
+            continue; // Continue instead of breaking
         }
     }
 
@@ -2345,6 +2345,10 @@ fn normalize_commit_message(message: &str) -> String {
     text = text.replace("[self-improve]", "");
     text = text.replace("(self-improve)", "");
     
+    // Handle common abbreviations that should be normalized consistently
+    text = text.replace("I/O", "io");
+    text = text.replace("i/o", "io");
+    
     // Convert to lowercase and normalize punctuation and whitespace
     text = text
         .to_lowercase()
@@ -3251,5 +3255,20 @@ mod tests {
         // Last two should NOT be detected as duplicates
         assert!(!is_recent_commit(&recent_commits, potential_improvements[2].0));
         assert!(!is_recent_commit(&recent_commits, potential_improvements[3].0));
+    }
+
+    #[test]
+    fn test_debug_normalization() {
+        let original = "Optimize file reading with async I/O [self-improve]";
+        let normalized = normalize_commit_message(original);
+        println!("Original: '{}'", original);
+        println!("Normalized: '{}'", normalized);
+        
+        let test_input = "optimize file reading with async io";
+        let test_normalized = normalize_commit_message(test_input);
+        println!("Test input: '{}'", test_input);
+        println!("Test normalized: '{}'", test_normalized);
+        
+        assert_eq!(normalized, test_normalized);
     }
 }
