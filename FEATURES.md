@@ -2,10 +2,11 @@
 
 ## Overview
 
-The Nautilus Trader Autopatcher has been enhanced with two major new capabilities:
+The Nautilus Trader Autopatcher has been enhanced with three major new capabilities:
 
 1. **Self-Improvement**: The autopatcher can analyze and improve its own codebase
 2. **Automatic Pull Request Creation**: Create PRs against the target repository
+3. **Commit Quality Analyzer**: Analyze git commits for inconsistencies, typos, and pattern violations
 
 ## Features
 
@@ -129,6 +130,39 @@ pub struct GitHubConfig {
 🔄 Restarting after self-improvement...
 ```
 
+### 3. Commit Quality Analyzer
+
+A standalone tool for analyzing git commit messages for quality issues.
+
+**Key Features:**
+
+- **Pattern Analysis**: Validates commits against established patterns like `<Action> <Component> <description>`
+- **Typo Detection**: Identifies common misspellings and grammar errors
+- **AI Enhancement**: Optional AI-powered analysis using DeepSeek for advanced insights
+- **Multiple Formats**: Text and JSON output for both human and programmatic use
+- **Scoring System**: Assigns quality scores (0-100) to each commit
+
+**Usage Examples:**
+
+```bash
+# Basic analysis of last 20 commits
+cargo run -- analyze-commits
+
+# AI-enhanced analysis with custom count
+cargo run -- analyze-commits --count 10 --with-ai
+
+# JSON output for CI/CD integration
+cargo run -- analyze-commits --format json
+```
+
+**Analysis Categories:**
+
+- Pattern violations (missing action words, inconsistent format)
+- Text quality issues (typos, grammar, length)
+- Formatting inconsistencies
+
+See [COMMIT_ANALYZER.md](COMMIT_ANALYZER.md) for detailed documentation.
+
 ## Future Enhancements
 
 - Complete GitHub API integration for PR creation
@@ -136,3 +170,4 @@ pub struct GitHubConfig {
 - Integration with code review workflows
 - Automated testing of self-improvements before applying
 - Rollback capability for failed self-improvements
+- Advanced commit analysis patterns and AI models

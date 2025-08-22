@@ -1,11 +1,7 @@
 use serde::{Deserialize, Serialize};
-use std::path::PathBimpl Default for AutopatcherConfig {
-    fn default() -> Self {
-        Self {
-            model: "deepseek-chat".to_string(),
-            max_tokens: 8192,
-            temperature: 0.3,
-            max_iterations: 1000, // Increased to allow much longer runsderive(Debug, Clone, Serialize, Deserialize)]
+use std::path::PathBuf;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CronConfig {
     /// Cron schedule expression (e.g., "0 */5 * * * *" for every 5 minutes)
     pub schedule: String,
@@ -34,7 +30,7 @@ pub struct AutopatcherConfig {
     /// The model to use for the autopatcher
     pub model: String,
     /// The maximum number of tokens to generate
-    pub max_tokens: u32,
+    pub max_tokens: usize,
     /// The temperature for generation (0.0 to 1.0)
     pub temperature: f32,
     /// The number of iterations to run the autopatcher
@@ -278,7 +274,7 @@ impl GitConfig {
                 "*.pem".to_string(),
                 "*.key".to_string(),
             ],
-            remote_url: std::env::var("https://github.com/nicolad/nautilus_trader_rig").ok(),
+            remote_url: std::env::var("https://github.com/nicolad/nautilus-trader-rig").ok(),
             target_branch: std::env::var("main").ok(),
         }
     }
