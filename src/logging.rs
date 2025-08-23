@@ -1,224 +1,352 @@
-// src/logging.rs
-//
-// Comprehensive logging module for the Nautilus Trader Autopatcher
-//
-// Provides both console and file-based logging with structured output
-// for better debugging and monitoring of autopatcher activities.
+//! Centralized logging configuration for Nautilus Trader Rig
+//! 
+//! This module provides consistent logging setup across all components with:
+//! - Structured logging with tracing
+//! - Environment-based log levels
+//! - Color-coded output for development
+//! - File output for production
+//! - Performance monitoring
+//! - Component-specific logging levels
 
-use anyhow::{Context, Result};
-use chrono::Utc;
-use std::fs::{self, OpenOptions};
-use std::io::{BufWriter, Write};
+use anyhow::Result;
 use std::path::Path;
-use std::sync::Arc;
-use tokio::sync::Mutex;
+use tracing::{debug, info, Level};
+use tracing_subscriber::{fmt, EnvFilter};
+use crate::config::Config;
 
-/// File-based logger for detailed autopatcher activity
-#[derive(Clone)]
-pub struct FileLogger {
-    log_file: Arc<Mutex<BufWriter<std::fs::File>>>,
-    log_path: String,
+/// Log levels for different components
+#[derive(Debug, Clone)]
+pub enum LogLevel {
+    Trace,
+    Debug, 
+    Info,
+    Warn,
+    Error,
 }
 
-impl FileLogger {
-    /// Create a new file logger in the .logs directory
-    pub fn new() -> Result<Self> {
-        let log_dir = Path::new(".logs");
-        fs::create_dir_all(log_dir)?;
-        
-        let timestamp = Utc::now().format("%Y%m%d_%H%M%S");
-        let log_path = log_dir.join(format!("autopatcher_{}.log", timestamp));
-        
-        let file = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&log_path)
-            .with_context(|| format!("Failed to create log file: {}", log_path.display()))?;
-        
-        let log_file = Arc::new(Mutex::new(BufWriter::new(file)));
-        
-        println!("📁 Created log file: {}", log_path.display());
-        
-        Ok(Self { 
-            log_file,
-            log_path: log_path.to_string_lossy().to_string(),
-        })
-    }
-    
-    /// Log a message to the file with timestamp
-    pub async fn log(&self, message: &str) -> Result<()> {
-        let timestamp = Utc::now().format("%Y-%m-%d %H:%M:%S UTC");
-        let formatted = format!("[{}] {}\n", timestamp, message);
-        
-        let mut writer = self.log_file.lock().await;
-        writer.write_all(formatted.as_bytes())
-            .with_context(|| "Failed to write to log file")?;
-        writer.flush()
-            .with_context(|| "Failed to flush log file")?;
-        Ok(())
-    }
-    
-    /// Log an info message
-    pub async fn info(&self, message: &str) -> Result<()> {
-        self.log(&format!("INFO: {}", message)).await
-    }
-    
-    /// Log a warning message
-    pub async fn warn(&self, message: &str) -> Result<()> {
-        self.log(&format!("WARN: {}", message)).await
-    }
-    
-    /// Log an error message
-    pub async fn error(&self, message: &str) -> Result<()> {
-        self.log(&format!("ERROR: {}", message)).await
-    }
-    
-    /// Log a debug message
-    pub async fn debug(&self, message: &str) -> Result<()> {
-        self.log(&format!("DEBUG: {}", message)).await
-    }
-    
-    /// Log the start of a major operation
-    pub async fn operation_start(&self, operation: &str, details: &str) -> Result<()> {
-        self.log(&format!("🚀 OPERATION START: {} - {}", operation, details)).await
-    }
-    
-    /// Log the completion of a major operation
-    pub async fn operation_complete(&self, operation: &str, duration_ms: u64, success: bool) -> Result<()> {
-        let status = if success { "✅ SUCCESS" } else { "❌ FAILED" };
-        self.log(&format!("{}: {} completed in {}ms", status, operation, duration_ms)).await
-    }
-    
-    /// Log autopatcher iteration details
-    pub async fn iteration(&self, iter: u32, max_iter: u32, action: &str) -> Result<()> {
-        self.log(&format!("🔄 ITERATION {}/{}: {}", iter, max_iter, action)).await
-    }
-    
-    /// Log AI interaction details
-    pub async fn ai_interaction(&self, agent_name: &str, prompt_size: usize, response_size: usize, duration_ms: u64) -> Result<()> {
-        self.log(&format!("🤖 AI: {} | Prompt: {} chars | Response: {} chars | Duration: {}ms", 
-                         agent_name, prompt_size, response_size, duration_ms)).await
-    }
-    
-    /// Log patch application details
-    #[allow(dead_code)]
-    pub async fn patch_applied(&self, patch_title: &str, file_count: usize, success: bool) -> Result<()> {
-        let status = if success { "✅" } else { "❌" };
-        self.log(&format!("{} PATCH: '{}' affecting {} files", status, patch_title, file_count)).await
-    }
-    
-    /// Log git operations
-    #[allow(dead_code)]
-    pub async fn git_operation(&self, operation: &str, branch: Option<&str>, success: bool) -> Result<()> {
-        let status = if success { "✅" } else { "❌" };
-        let branch_info = branch.map(|b| format!(" [{}]", b)).unwrap_or_default();
-        self.log(&format!("{} GIT: {}{}", status, operation, branch_info)).await
-    }
-    
-    /// Get the path to the current log file
-    pub fn log_path(&self) -> &str {
-        &self.log_path
+impl From<LogLevel> for Level {
+    fn from(level: LogLevel) -> Self {
+        match level {
+            LogLevel::Trace => Level::TRACE,
+            LogLevel::Debug => Level::DEBUG,
+            LogLevel::Info => Level::INFO,
+            LogLevel::Warn => Level::WARN,
+            LogLevel::Error => Level::ERROR,
+        }
     }
 }
 
-/// Enhanced logging configuration and utilities
-pub struct LoggingConfig {
-    pub console_level: log::LevelFilter,
-    pub file_enabled: bool,
-    #[allow(dead_code)]
-    pub structured_output: bool,
+/// Logging configuration for the application
+#[derive(Debug, Clone)]
+pub struct LogConfig {
+    /// Base log level for the application
+    pub level: LogLevel,
+    /// Enable file logging
+    pub file_logging: bool,
+    /// Log file path (if file logging enabled)
+    pub log_file: Option<String>,
+    /// Enable colored output (for development)
+    pub colored: bool,
+    /// Include timestamps
+    pub timestamps: bool,
+    /// Include source location (file:line)
+    pub include_location: bool,
+    /// Component-specific log levels
+    pub component_levels: Vec<(String, LogLevel)>,
 }
 
-impl Default for LoggingConfig {
+impl Default for LogConfig {
     fn default() -> Self {
         Self {
-            console_level: log::LevelFilter::Info,
-            file_enabled: true,
-            structured_output: true,
+            level: LogLevel::Info,
+            file_logging: false,
+            log_file: None,
+            colored: true,
+            timestamps: true,
+            include_location: true,
+            component_levels: vec![
+                ("nautilus_trader_rig".to_string(), LogLevel::Info),
+                ("ort".to_string(), LogLevel::Warn),  // Reduce ONNX runtime noise
+                ("hf_hub".to_string(), LogLevel::Info),
+                ("rig".to_string(), LogLevel::Info),
+                ("mcp".to_string(), LogLevel::Debug),  // Detailed MCP logging
+                ("config".to_string(), LogLevel::Debug),
+                ("vector_store".to_string(), LogLevel::Info),
+                ("deepseek".to_string(), LogLevel::Info),
+            ],
         }
     }
 }
 
-/// Initialize comprehensive logging for the autopatcher
-pub async fn initialize_logging(config: LoggingConfig) -> Result<Option<FileLogger>> {
-    println!("📋 Initializing enhanced logging system");
-    
-    // Initialize file logger if enabled
-    let file_logger = if config.file_enabled {
-        match FileLogger::new() {
-            Ok(logger) => {
-                println!("📁 File logging initialized successfully");
-                logger.info("Autopatcher logging system initialized").await?;
-                Some(logger)
-            }
-            Err(e) => {
-                println!("⚠️  File logging failed to initialize: {}", e);
-                None
-            }
+impl LogConfig {
+    /// Create a new log configuration
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Set the base log level
+    pub fn with_level(mut self, level: LogLevel) -> Self {
+        self.level = level;
+        self
+    }
+
+    /// Enable file logging with specified path
+    pub fn with_file_logging<P: AsRef<Path>>(mut self, log_file: P) -> Self {
+        self.file_logging = true;
+        self.log_file = Some(log_file.as_ref().to_string_lossy().to_string());
+        self
+    }
+
+    /// Set colored output (useful for development vs production)
+    pub fn with_colored(mut self, colored: bool) -> Self {
+        self.colored = colored;
+        self
+    }
+
+    /// Include source code location in logs
+    pub fn with_location(mut self, include_location: bool) -> Self {
+        self.include_location = include_location;
+        self
+    }
+
+    /// Add component-specific log level
+    pub fn with_component_level(mut self, component: &str, level: LogLevel) -> Self {
+        self.component_levels.push((component.to_string(), level));
+        self
+    }
+
+    /// Initialize the global tracing subscriber with dual output (console + file)
+    pub fn init(self) -> Result<()> {
+        use tracing_subscriber::layer::SubscriberExt;
+        use tracing_subscriber::Layer;
+        
+        // Build the environment filter
+        let mut filter = EnvFilter::from_default_env()
+            .add_directive(format!("{}={}", 
+                env!("CARGO_PKG_NAME").replace('-', "_"), 
+                self.level_string()).parse()?);
+
+        // Add component-specific filters
+        for (component, level) in &self.component_levels {
+            filter = filter.add_directive(
+                format!("{}={}", component, level_string(level)).parse()?
+            );
         }
-    } else {
-        None
+
+        // Create console layer (always enabled for development)
+        let console_layer = tracing_subscriber::fmt::layer()
+            .with_ansi(self.colored)
+            .with_target(true)
+            .with_file(self.include_location)
+            .with_line_number(self.include_location)
+            .compact();
+
+        // Create the subscriber with console layer
+        let subscriber = tracing_subscriber::registry()
+            .with(filter)
+            .with(console_layer);
+
+        // Add file layer if file logging is enabled
+        if self.file_logging {
+            if let Some(log_file) = &self.log_file {
+                match std::fs::OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open(log_file) {
+                    Ok(file) => {
+                        let file_layer = tracing_subscriber::fmt::layer()
+                            .with_ansi(false)  // No colors in file
+                            .with_target(true)
+                            .with_file(true)
+                            .with_line_number(true)
+                            .compact()
+                            .with_writer(file);
+                            
+                        let subscriber = subscriber.with(file_layer);
+                        tracing::subscriber::set_global_default(subscriber)?;
+                        
+                        info!("🚀 Logging system initialized with console and file output");
+                        debug!("Log file: {}", log_file);
+                    }
+                    Err(e) => {
+                        tracing::subscriber::set_global_default(subscriber)?;
+                        info!("🚀 Logging system initialized with console output only");
+                        eprintln!("❌ Failed to open log file '{}': {}", log_file, e);
+                        eprintln!("Continuing with console logging only");
+                    }
+                }
+            } else {
+                tracing::subscriber::set_global_default(subscriber)?;
+                info!("🚀 Logging system initialized with console output only");
+            }
+        } else {
+            tracing::subscriber::set_global_default(subscriber)?;
+            info!("🚀 Logging system initialized with console output only");
+        }
+
+        debug!("Log configuration: {:?}", self);
+        
+        Ok(())
+    }
+
+    fn level_string(&self) -> &'static str {
+        level_string(&self.level)
+    }
+}
+
+fn level_string(level: &LogLevel) -> &'static str {
+    match level {
+        LogLevel::Trace => "trace",
+        LogLevel::Debug => "debug", 
+        LogLevel::Info => "info",
+        LogLevel::Warn => "warn",
+        LogLevel::Error => "error",
+    }
+}
+
+/// Initialize logging with default configuration
+pub fn init_default_logging() -> Result<()> {
+    LogConfig::default().init()
+}
+
+/// Initialize logging for development (verbose, colored, with file output)
+pub fn init_dev_logging() -> Result<()> {
+    // Create logs directory if it doesn't exist
+    if !Config::logs_directory_exists() {
+        std::fs::create_dir_all(Config::logs_directory())?;
+        println!("📁 Created logs directory: {:?}", Config::logs_directory());
+    }
+    
+    // Generate timestamped log file path
+    let log_file = Config::generate_log_file_path();
+    println!("📝 Log file will be created at: {:?}", log_file);
+    
+    // Test file creation to ensure path is writable
+    if let Some(parent) = log_file.parent() {
+        if !parent.exists() {
+            std::fs::create_dir_all(parent)?;
+            println!("📁 Created parent directories for log file");
+        }
+    }
+    
+    LogConfig::new()
+        .with_level(LogLevel::Debug)
+        .with_colored(true)
+        .with_location(true)
+        .with_file_logging(log_file)
+        .with_component_level("nautilus_trader_rig", LogLevel::Debug)
+        .with_component_level("mcp", LogLevel::Debug)
+        .with_component_level("config", LogLevel::Debug)
+        .init()
+}
+
+/// Initialize logging for production (concise, file-based)
+pub fn init_prod_logging<P: AsRef<Path>>(log_file: P) -> Result<()> {
+    LogConfig::new()
+        .with_level(LogLevel::Info)
+        .with_colored(false)
+        .with_location(false)
+        .with_file_logging(log_file)
+        .with_component_level("ort", LogLevel::Error)  // Minimize ONNX noise in prod
+        .init()
+}
+
+/// Structured logging macros for consistent formatting
+
+/// Log file processing operations
+macro_rules! log_file_processing {
+    ($level:ident, $action:expr, $file:expr) => {
+        tracing::$level!("📄 {} file: {}", $action, $file);
     };
-    
-    // Initialize console logging
-    if std::env::var("RUST_LOG").is_err() {
-        std::env::set_var("RUST_LOG", "info");
-        println!("📋 Set RUST_LOG to info level");
-    }
-
-    match env_logger::Builder::from_default_env()
-        .filter_level(config.console_level)
-        .format_timestamp_secs()
-        .try_init()
-    {
-        Ok(_) => {
-            println!("📋 Console logging initialized successfully");
-            if let Some(ref logger) = file_logger {
-                logger.info("Console logging initialized").await?;
-            }
-        }
-        Err(e) => {
-            println!("📋 Console logging already initialized: {}", e);
-        }
-    }
-
-    Ok(file_logger)
+    ($level:ident, $action:expr, $file:expr, $size:expr) => {
+        tracing::$level!("📄 {} file: {} ({} bytes)", $action, $file, $size);
+    };
 }
 
-/// Structured logging helper for autopatcher operations
-pub struct OperationLogger {
-    file_logger: Option<FileLogger>,
-    operation: String,
-    start_time: std::time::Instant,
+/// Log directory operations  
+macro_rules! log_directory_op {
+    ($level:ident, $action:expr, $dir:expr) => {
+        tracing::$level!("📁 {} directory: {:?}", $action, $dir);
+    };
+    ($level:ident, $action:expr, $dir:expr, $count:expr) => {
+        tracing::$level!("📁 {} directory: {:?} ({} items)", $action, $dir, $count);
+    };
 }
 
-impl OperationLogger {
-    pub async fn new(operation: &str, file_logger: Option<FileLogger>) -> Self {
-        let start_time = std::time::Instant::now();
+/// Log configuration operations
+macro_rules! log_config_op {
+    ($level:ident, $action:expr, $component:expr) => {
+        tracing::$level!("🔧 {} {}", $action, $component);
+    };
+    ($level:ident, $action:expr, $component:expr, $value:expr) => {
+        tracing::$level!("🔧 {} {}: {}", $action, $component, $value);
+    };
+}
+
+/// Log network/MCP operations
+macro_rules! log_mcp_op {
+    ($level:ident, $action:expr, $details:expr) => {
+        tracing::$level!("🌐 MCP {}: {}", $action, $details);
+    };
+    ($level:ident, $action:expr) => {
+        tracing::$level!("🌐 MCP {}", $action);
+    };
+}
+
+/// Log performance metrics
+macro_rules! log_performance {
+    ($level:ident, $operation:expr, $duration:expr) => {
+        tracing::$level!("⏱️ {} took: {:?}", $operation, $duration);
+    };
+    ($level:ident, $operation:expr, $duration:expr, $count:expr) => {
+        tracing::$level!("⏱️ {} took: {:?} ({} items)", $operation, $duration, $count);
+    };
+}
+
+/// Log system status
+macro_rules! log_status {
+    (success, $message:expr) => {
+        tracing::info!("✅ {}", $message);
+    };
+    (warning, $message:expr) => {
+        tracing::warn!("⚠️ {}", $message);
+    };
+    (error, $message:expr) => {
+        tracing::error!("❌ {}", $message);
+    };
+    (info, $message:expr) => {
+        tracing::info!("ℹ️ {}", $message);
+    };
+}
+
+// Re-export macros for use in other modules
+pub(crate) use log_file_processing;
+pub(crate) use log_directory_op;
+pub(crate) use log_config_op;
+pub(crate) use log_mcp_op;
+pub(crate) use log_performance;
+pub(crate) use log_status;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_log_config_creation() {
+        let config = LogConfig::new()
+            .with_level(LogLevel::Debug)
+            .with_colored(false)
+            .with_location(true);
         
-        if let Some(ref logger) = file_logger {
-            let _ = logger.operation_start(operation, "Starting operation").await;
-        }
-        
-        Self {
-            file_logger,
-            operation: operation.to_string(),
-            start_time,
-        }
+        assert!(matches!(config.level, LogLevel::Debug));
+        assert!(!config.colored);
+        assert!(config.include_location);
     }
-    
-    pub async fn complete(self, success: bool) {
-        let duration = self.start_time.elapsed().as_millis() as u64;
-        
-        if let Some(ref logger) = self.file_logger {
-            let _ = logger.operation_complete(&self.operation, duration, success).await;
-        }
-    }
-    
-    #[allow(dead_code)]
-    pub async fn log(&self, message: &str) {
-        if let Some(ref logger) = self.file_logger {
-            let _ = logger.log(&format!("[{}] {}", self.operation, message)).await;
-        }
+
+    #[test]
+    fn test_level_conversion() {
+        assert_eq!(Level::from(LogLevel::Info), Level::INFO);
+        assert_eq!(Level::from(LogLevel::Debug), Level::DEBUG);
+        assert_eq!(Level::from(LogLevel::Error), Level::ERROR);
     }
 }

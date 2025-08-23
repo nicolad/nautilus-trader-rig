@@ -7,29 +7,43 @@
 
 use anyhow::{anyhow, Result};
 use rig::completion::Prompt;
-use rig::prelude::*;
-use rig::providers;
+use rig::providers::deepseek;
+use rig::client::{CompletionClient, ProviderClient};
+use reqwest;
+use serde::{Deserialize, Serialize};
+use std::env;
+use tracing::{info, debug};
 
 /// DeepSeek client using rig framework
 #[derive(Clone, Debug)]
 pub struct DeepSeekClient {
-    client: providers::deepseek::Client,
+    client: deepseek::Client,
 }
 
 impl DeepSeekClient {
     /// Create a new DeepSeek client with the provided API key
     #[allow(dead_code)]
     pub fn new(api_key: String) -> Self {
-        let client = providers::deepseek::Client::new(&api_key);
+        let client = deepseek::Client::new(&api_key);
         Self { client }
     }
 
     /// Create a DeepSeek client from the DEEPSEEK_API_KEY environment variable
     pub fn from_env() -> Result<Self> {
-        let api_key = std::env::var("DEEPSEEK_API_KEY")
-            .map_err(|_| anyhow!("DEEPSEEK_API_KEY environment variable not set"))?;
-        let client = providers::deepseek::Client::new(&api_key);
-        Ok(Self { client })
+        // Check if the environment variable exists first
+        match env::var("DEEPSEEK_API_KEY") {
+            Ok(api_key) => {
+                if api_key.trim().is_empty() {
+                    return Err(anyhow!("DEEPSEEK_API_KEY environment variable is empty"));
+                }
+                // Use the rig framework client
+                let client = deepseek::Client::from_env();
+                Ok(Self { client })
+            }
+            Err(_) => {
+                Err(anyhow!("DEEPSEEK_API_KEY environment variable not set"))
+            }
+        }
     }
 
     /// Send a simple prompt and get the complete response
@@ -46,7 +60,7 @@ impl DeepSeekClient {
 
         let agent = self
             .client
-            .agent(providers::deepseek::DEEPSEEK_CHAT)
+            .agent(deepseek::DEEPSEEK_CHAT)
             .preamble("You are a helpful assistant specialized in code analysis and improvement.")
             .name(agent_name)
             .build();
@@ -72,7 +86,7 @@ impl DeepSeekClient {
         
         let agent = self
             .client
-            .agent(providers::deepseek::DEEPSEEK_CHAT)
+            .agent(deepseek::DEEPSEEK_CHAT)
             .preamble(
                 "You are an expert code quality analyst specializing in commit message analysis, \
                  typo detection, and pattern consistency. You help identify inconsistencies, \
@@ -88,13 +102,67 @@ impl DeepSeekClient {
         Ok(response)
     }
 
+    /// Analyze critical bugs and create tests to reproduce criticality
+    pub async fn confirm_critical_bug(&self, bug_description: &str, code_sample: &str) -> Result<String> {
+        log::info!("🔍 Confirming critical bug with DeepSeek");
+        
+        let agent = self
+            .client
+            .agent(deepseek::DEEPSEEK_CHAT)
+            .preamble(
+                "You are an expert security researcher and test engineer specializing in critical bug analysis. \
+                 Your task is to:\
+                 1. Analyze reported bugs to confirm if they are truly critical\
+                 2. Create specific test cases to reproduce the vulnerability\
+                 3. Assess the actual risk level and potential impact\
+                 4. Provide concrete evidence of criticality\
+                 \
+                 For each bug, provide:\
+                 - CRITICAL_CONFIRMED: true/false\
+                 - RISK_LEVEL: CRITICAL/HIGH/MEDIUM/LOW\
+                 - REPRODUCTION_STEPS: detailed steps to reproduce\
+                 - TEST_CODE: actual test code that demonstrates the vulnerability\
+                 - IMPACT_ASSESSMENT: real-world impact description"
+            )
+            .name("Critical-Bug-Validator")
+            .build();
+
+        let prompt = format!(
+            "CRITICAL BUG ANALYSIS REQUEST\n\
+             ===============================\n\
+             \n\
+             Bug Description: {}\n\
+             \n\
+             Code Sample:\n\
+             ```\n\
+             {}\n\
+             ```\n\
+             \n\
+             Please analyze this bug and provide:\n\
+             1. Is this truly critical? (CRITICAL_CONFIRMED: true/false)\n\
+             2. Risk level assessment (RISK_LEVEL: CRITICAL/HIGH/MEDIUM/LOW)\n\
+             3. Step-by-step reproduction instructions\n\
+             4. Test code that reproduces the vulnerability\n\
+             5. Real-world impact assessment\n\
+             \n\
+             Focus on trading system impacts: financial loss, security breaches, data corruption.",
+            bug_description, code_sample
+        );
+
+        log::debug!("📤 Sending critical bug confirmation prompt: {} chars", prompt.len());
+        let response = agent.prompt(&prompt).await?;
+        log::info!("📥 Received critical bug confirmation: {} chars", response.len());
+
+        Ok(response)
+    }
+
     /// Send a prompt for critical code analysis with appropriate context
     pub async fn analyze_code(&self, prompt: &str) -> Result<String> {
         log::info!("🔍 Starting critical code analysis with DeepSeek");
         
         let agent = self
             .client
-            .agent(providers::deepseek::DEEPSEEK_CHAT)
+            .agent(deepseek::DEEPSEEK_CHAT)
             .preamble(
                 "You are an expert critical code analyst specializing in security vulnerabilities, \
                  reliability issues, financial calculation errors, and performance problems. \
@@ -149,6 +217,96 @@ impl DeepSeekClient {
         } else {
             Err(anyhow!("DeepSeek API connection validation failed: unexpected response"))
         }
+    }
+}
+
+// DeepSeek Embedding Client Structures
+#[derive(Debug, Serialize)]
+struct DeepSeekEmbeddingRequest {
+    model: String,
+    input: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct DeepSeekEmbeddingResponse {
+    data: Vec<EmbeddingData>,
+    usage: Usage,
+}
+
+#[derive(Debug, Deserialize)]
+struct EmbeddingData {
+    embedding: Vec<f32>,
+    index: usize,
+}
+
+#[derive(Debug, Deserialize)]
+struct Usage {
+    prompt_tokens: u32,
+    total_tokens: u32,
+}
+
+/// DeepSeek embedding client for vector embeddings
+pub struct DeepSeekEmbeddingClient {
+    client: reqwest::Client,
+    api_key: String,
+    base_url: String,
+    model: String,
+}
+
+impl DeepSeekEmbeddingClient {
+    pub fn new() -> Result<Self> {
+        let api_key = env::var("DEEPSEEK_API_KEY")
+            .map_err(|_| anyhow!("DEEPSEEK_API_KEY environment variable not set"))?;
+        
+        let client = reqwest::Client::new();
+        
+        Ok(Self {
+            client,
+            api_key,
+            base_url: "https://api.deepseek.com/v1".to_string(),
+            model: "text-embedding-ada-002".to_string(), // DeepSeek's embedding model
+        })
+    }
+    
+    pub async fn embed_texts(&self, texts: Vec<String>) -> Result<Vec<Vec<f32>>> {
+        let request = DeepSeekEmbeddingRequest {
+            model: self.model.clone(),
+            input: texts,
+        };
+        
+        debug!("Making DeepSeek embedding request for {} texts", request.input.len());
+        
+        let response = self.client
+            .post(&format!("{}/embeddings", self.base_url))
+            .header("Authorization", format!("Bearer {}", self.api_key))
+            .header("Content-Type", "application/json")
+            .json(&request)
+            .send()
+            .await?;
+        
+        if !response.status().is_success() {
+            let error_text = response.text().await?;
+            return Err(anyhow!("DeepSeek API error: {}", error_text));
+        }
+        
+        let embedding_response: DeepSeekEmbeddingResponse = response.json().await?;
+        
+        info!("DeepSeek embedding token usage: {} prompt tokens, {} total tokens", 
+              embedding_response.usage.prompt_tokens, 
+              embedding_response.usage.total_tokens);
+        
+        let embeddings = embedding_response.data
+            .into_iter()
+            .map(|data| data.embedding)
+            .collect();
+        
+        Ok(embeddings)
+    }
+    
+    pub async fn embed_text(&self, text: String) -> Result<Vec<f32>> {
+        let embeddings = self.embed_texts(vec![text]).await?;
+        embeddings.into_iter().next()
+            .ok_or_else(|| anyhow!("No embedding returned from DeepSeek API"))
     }
 }
 
@@ -252,5 +410,18 @@ mod tests {
         assert!(true); // If we get here, clone worked
         
         std::env::remove_var("DEEPSEEK_API_KEY");
+    }
+
+    #[tokio::test]
+    async fn test_deepseek_embedding() {
+        // Skip test if no DeepSeek API key
+        if env::var("DEEPSEEK_API_KEY").is_err() {
+            return;
+        }
+
+        let client = DeepSeekEmbeddingClient::new().unwrap();
+        let embedding = client.embed_text("Hello world".to_string()).await.unwrap();
+        assert!(!embedding.is_empty());
+        println!("Embedding dimension: {}", embedding.len());
     }
 }
