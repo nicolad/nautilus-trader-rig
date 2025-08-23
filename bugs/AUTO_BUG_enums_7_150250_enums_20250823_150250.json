@@ -1,0 +1,10 @@
+{
+  "adapter_name": "enums",
+  "analysis_context": "Automated detection via Nautilus Trader Rig",
+  "bug_id": "AUTO_BUG_enums_7_150250",
+  "code_sample": "See file content",
+  "description": "The `Exchange::from_venue_str` method contains a critical logic error in the bidirectional mapping between venues and exchanges. The method returns a vector of exchanges for a given venue string, but the implementation has inconsistent mappings that break the bidirectional relationship. Specifically, when converting back from exchange to venue string using `as_venue_str()`, some exchanges map to different venue strings than what was used to retrieve them, breaking the expected symmetry.",
+  "fix_suggestion": "",
+  "severity": "HIGH",
+  "timestamp": "20250823_150250"
+}

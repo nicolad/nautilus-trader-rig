@@ -1,0 +1,10 @@
+{
+  "adapter_name": "factories",
+  "analysis_context": "Automated detection via Nautilus Trader Rig",
+  "bug_id": "AUTO_BUG_factories_12_150543",
+  "code_sample": "See file content",
+  "description": "The code has a critical security vulnerability where API keys are being stored and passed as `String` types, which can lead to sensitive data exposure in memory. API keys can remain in memory longer than necessary and could be exposed through memory dumps or debugging tools. Additionally, the `publishers_filepath` is being used without proper validation, which could potentially lead to path traversal attacks if an attacker can control this input.",
+  "fix_suggestion": "Use a secure string type that zeroes memory on drop (like `secrecy::SecretString`) for API keys. Validate and sanitize all file paths to prevent directory traversal attacks. Consider using environment variables or secure configuration stores for sensitive data instead of passing them as plain strings.",
+  "severity": "HIGH",
+  "timestamp": "20250823_150543"
+}

@@ -1,0 +1,10 @@
+{
+  "adapter_name": "historical",
+  "analysis_context": "Automated detection via Nautilus Trader Rig",
+  "bug_id": "AUTO_BUG_historical_10_150432",
+  "code_sample": "",
+  "description": "The code has several potential issues including: 1) Poisoned lock handling - the code checks for poisoned locks but doesn't handle them properly, potentially causing panics; 2) Time-of-check to time-of-use (TOCTOU) race condition in `get_range_quotes` where the schema validation occurs before acquiring the lock, allowing potential schema changes; 3) Hardcoded USD currency assumption in multiple methods (`Currency::USD().precision`) which could cause incorrect price precision calculations for non-USD instruments; 4) Potential blocking operations in async context when reading files in `new()` method; 5) Error handling inconsistencies where some errors are logged while others bubble up.",
+  "fix_suggestion": "",
+  "severity": "MEDIUM",
+  "timestamp": "20250823_150432"
+}

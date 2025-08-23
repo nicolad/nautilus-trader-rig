@@ -3,23 +3,23 @@
 // This implementation uses rig-sqlite for vector similarity search
 
 use anyhow::Result;
+use serde_json;
 use std::time::Duration;
 use tokio;
 use tracing::{debug, error, info, trace, warn};
-use serde_json;
 
-mod vector_store;
-mod deepseek;
-mod mcp;
-mod fastembed;
 mod config;
+mod deepseek;
+mod fastembed;
 mod logging;
+mod mcp;
+mod vector_store;
 
-use vector_store::VectorStoreManager;
-use deepseek::DeepSeekClient;
-use mcp::run_mcp_server;
 use config::Config;
-use logging::{init_dev_logging, log_file_processing, log_directory_op, log_status};
+use deepseek::DeepSeekClient;
+use logging::{init_dev_logging, log_directory_op, log_file_processing, log_status};
+use mcp::run_mcp_server;
+use vector_store::VectorStoreManager;
 
 pub struct UnifiedServerState {
     pub vector_store: Option<VectorStoreManager>,
@@ -84,11 +84,11 @@ impl UnifiedServerState {
 // Function to test DeepSeek client functionality
 async fn test_deepseek_client(state: &UnifiedServerState) -> Result<()> {
     info!("🤖 Starting DeepSeek client functionality tests...");
-    
+
     if let Some(client) = &state.deepseek_client {
         debug!("DeepSeek client available, proceeding with tests");
         println!("🤖 Testing DeepSeek client functionality...");
-        
+
         // Test basic prompt
         println!("\n📝 Testing basic prompt:");
         trace!("Sending basic connectivity test prompt to DeepSeek");
@@ -103,7 +103,7 @@ async fn test_deepseek_client(state: &UnifiedServerState) -> Result<()> {
                 error!("Basic prompt test failed: {}", e);
             }
         }
-        
+
         // Test code analysis
         println!("\n🔍 Testing code analysis:");
         debug!("Preparing code analysis test with sample security vulnerability");
@@ -114,53 +114,72 @@ fn unsafe_transfer(amount: f64) -> bool {
     true
 }";
         trace!("Sending code analysis request to DeepSeek");
-        match client.analyze_code(&format!("Analyze this Rust code for security issues:\n{}", test_code)).await {
+        match client
+            .analyze_code(&format!(
+                "Analyze this Rust code for security issues:\n{}",
+                test_code
+            ))
+            .await
+        {
             Ok(analysis) => {
                 println!("   ✅ Code analysis completed");
-                println!("   📊 Analysis (first 200 chars): {}...", 
-                    analysis.chars().take(200).collect::<String>());
-                debug!("Code analysis successful, full response length: {} chars", analysis.len());
+                println!(
+                    "   📊 Analysis (first 200 chars): {}...",
+                    analysis.chars().take(200).collect::<String>()
+                );
+                debug!(
+                    "Code analysis successful, full response length: {} chars",
+                    analysis.len()
+                );
             }
             Err(e) => {
                 println!("   ❌ Code analysis failed: {}", e);
             }
         }
-        
+
         // Test critical bug confirmation
         println!("\n� Testing critical bug confirmation:");
-        match client.confirm_critical_bug(
-            "Potential authentication bypass in trading API",
-            "if user.is_authenticated() { /* process */ }"
-        ).await {
+        match client
+            .confirm_critical_bug(
+                "Potential authentication bypass in trading API",
+                "if user.is_authenticated() { /* process */ }",
+            )
+            .await
+        {
             Ok(confirmation) => {
                 println!("   ✅ Bug confirmation completed");
-                println!("   🔍 Confirmation (first 200 chars): {}...", 
-                    confirmation.chars().take(200).collect::<String>());
-                debug!("Bug confirmation successful, response length: {} chars", confirmation.len());
+                println!(
+                    "   🔍 Confirmation (first 200 chars): {}...",
+                    confirmation.chars().take(200).collect::<String>()
+                );
+                debug!(
+                    "Bug confirmation successful, response length: {} chars",
+                    confirmation.len()
+                );
             }
             Err(e) => {
                 println!("   ❌ Bug confirmation failed: {}", e);
                 error!("Bug confirmation test failed: {}", e);
             }
         }
-        
+
         info!("✅ DeepSeek client tests completed");
     } else {
         println!("⚠️ DeepSeek client not available (requires DEEPSEEK_API_KEY)");
         warn!("Skipping DeepSeek tests - client not initialized");
     }
-    
+
     Ok(())
 }
 
 // Function to test vector similarity search
 async fn test_vector_search(state: &UnifiedServerState) -> Result<()> {
     info!("🔍 Starting vector similarity search tests...");
-    
+
     if let Some(vector_store) = &state.vector_store {
         debug!("Vector store available, proceeding with similarity search tests");
         println!("🔍 Testing vector similarity search with rig-sqlite...");
-        
+
         let test_queries = vec![
             "authentication bypass vulnerability",
             "websocket security issues",
@@ -169,14 +188,22 @@ async fn test_vector_search(state: &UnifiedServerState) -> Result<()> {
         ];
 
         debug!("Testing {} different search queries", test_queries.len());
-        
+
         for (index, query) in test_queries.iter().enumerate() {
             println!("\n📝 Searching for: '{}'", query);
-            trace!("Running similarity search {}/{}: '{}'", index + 1, test_queries.len(), query);
-            
+            trace!(
+                "Running similarity search {}/{}: '{}'",
+                index + 1,
+                test_queries.len(),
+                query
+            );
+
             match vector_store.similarity_search(query, 3).await {
                 Ok(results) => {
-                    debug!("Similarity search completed, found {} results", results.len());
+                    debug!(
+                        "Similarity search completed, found {} results",
+                        results.len()
+                    );
                     if results.is_empty() {
                         println!("   No similar patterns found");
                         trace!("Empty result set for query: '{}'", query);
@@ -185,8 +212,8 @@ async fn test_vector_search(state: &UnifiedServerState) -> Result<()> {
                         for (i, result) in results.iter().enumerate() {
                             if let Some(id) = result.get("id") {
                                 if let Some(score) = result.get("score") {
-                                    println!("   {}. {} (score: {:.3})", i+1, id, score);
-                                    trace!("Result {}: id={}, score={:.6}", i+1, id, score);
+                                    println!("   {}. {} (score: {:.3})", i + 1, id, score);
+                                    trace!("Result {}: id={}, score={:.6}", i + 1, id, score);
                                 }
                             }
                         }
@@ -198,23 +225,23 @@ async fn test_vector_search(state: &UnifiedServerState) -> Result<()> {
                 }
             }
         }
-        
+
         info!("✅ Vector similarity search tests completed");
     } else {
         println!("⚠️ Vector store not available");
         warn!("Skipping vector search tests - store not initialized");
     }
-    
+
     Ok(())
 }
 
 // Function to discover Rust files in the adapters directory
 async fn discover_rust_files(adapters_path: &str) -> Result<Vec<String>> {
     let mut rust_files = Vec::new();
-    
+
     // Use the same logic as the main function for file discovery
     let rust_dirs = vec![std::path::Path::new(adapters_path)];
-    
+
     for rust_dir in rust_dirs {
         if let Ok(entries) = std::fs::read_dir(rust_dir) {
             for entry in entries.flatten() {
@@ -235,7 +262,7 @@ async fn discover_rust_files(adapters_path: &str) -> Result<Vec<String>> {
             }
         }
     }
-    
+
     Ok(rust_files)
 }
 
@@ -243,28 +270,36 @@ async fn discover_rust_files(adapters_path: &str) -> Result<Vec<String>> {
 async fn analyze_adapter_files_for_bugs(state: &UnifiedServerState) -> Result<()> {
     println!("\n🔍 Starting automated bug analysis on adapter files...");
     info!("Beginning automated bug analysis workflow");
-    
+
     // Get list of adapter files
-    let adapters_path = config::Config::CORE_ADAPTERS_DIRECTORY;
-    let rust_files = discover_rust_files(adapters_path).await?;
-    
+    let adapters_path = config::Config::core_adapters_directory_abs();
+    let rust_files = discover_rust_files(&adapters_path.to_string_lossy()).await?;
+
     if rust_files.is_empty() {
         println!("⚠️ No Rust files found for analysis");
         warn!("Bug analysis skipped - no files discovered");
         return Ok(());
     }
-    
+
     println!("📁 Found {} files to analyze", rust_files.len());
-    info!("Discovered {} Rust files for bug analysis", rust_files.len());
-    
+    info!(
+        "Discovered {} Rust files for bug analysis",
+        rust_files.len()
+    );
+
     let mut bugs_found = 0;
     let mut files_analyzed = 0;
-    
+
     // Analyze each file
     for (i, file_path) in rust_files.iter().enumerate() {
-        println!("   📄 Analyzing file {}/{}: {}", i+1, rust_files.len(), file_path);
+        println!(
+            "   📄 Analyzing file {}/{}: {}",
+            i + 1,
+            rust_files.len(),
+            file_path
+        );
         debug!("Starting analysis of file: {}", file_path);
-        
+
         // Read file content
         let content = match tokio::fs::read_to_string(file_path).await {
             Ok(content) => content,
@@ -274,9 +309,9 @@ async fn analyze_adapter_files_for_bugs(state: &UnifiedServerState) -> Result<()
                 continue;
             }
         };
-        
+
         files_analyzed += 1;
-        
+
         // Analyze with DeepSeek
         if let Some(deepseek_client) = &state.deepseek_client {
             let analysis_prompt = format!(
@@ -300,31 +335,54 @@ async fn analyze_adapter_files_for_bugs(state: &UnifiedServerState) -> Result<()
                  ANALYSIS: [brief analysis summary]",
                 file_path, content
             );
-            
+
             match deepseek_client.analyze_code(&analysis_prompt).await {
                 Ok(analysis_result) => {
-                    debug!("Analysis completed for {}, response length: {}", file_path, analysis_result.len());
-                    
+                    debug!(
+                        "Analysis completed for {}, response length: {}",
+                        file_path,
+                        analysis_result.len()
+                    );
+
                     // Check if bug was found
                     if analysis_result.contains("BUG_FOUND: yes") {
                         bugs_found += 1;
                         println!("   🐛 Bug detected! Storing analysis...");
-                        
+
                         // Extract bug details (simplified parsing)
-                        let severity = extract_field(&analysis_result, "SEVERITY").unwrap_or("MEDIUM".to_string());
-                        let description = extract_field(&analysis_result, "DESCRIPTION").unwrap_or("Bug detected by automated analysis".to_string());
-                        let code_sample = extract_field(&analysis_result, "CODE_SAMPLE").unwrap_or("See file content".to_string());
-                        let fix_suggestion = extract_field(&analysis_result, "FIX_SUGGESTION").unwrap_or("Manual review required".to_string());
-                        
+                        let severity = extract_field(&analysis_result, "SEVERITY")
+                            .unwrap_or("MEDIUM".to_string());
+                        let description = extract_field(&analysis_result, "DESCRIPTION")
+                            .unwrap_or("Bug detected by automated analysis".to_string());
+                        let code_sample = extract_field(&analysis_result, "CODE_SAMPLE")
+                            .unwrap_or("See file content".to_string());
+                        let fix_suggestion = extract_field(&analysis_result, "FIX_SUGGESTION")
+                            .unwrap_or("Manual review required".to_string());
+
                         // Generate bug ID
                         let file_name = std::path::Path::new(file_path)
                             .file_stem()
                             .and_then(|s| s.to_str())
                             .unwrap_or("unknown");
-                        let bug_id = format!("AUTO_BUG_{}_{}_{}", file_name, bugs_found, chrono::Utc::now().format("%H%M%S"));
-                        
+                        let bug_id = format!(
+                            "AUTO_BUG_{}_{}_{}",
+                            file_name,
+                            bugs_found,
+                            chrono::Utc::now().format("%H%M%S")
+                        );
+
                         // Store bug using internal function (simulating MCP call)
-                        match store_bug_internal(&bug_id, &severity, &description, Some(file_name.to_string()), &code_sample, &fix_suggestion).await {
+                        match store_bug_internal(
+                            &bug_id,
+                            &severity,
+                            &description,
+                            Some(file_name.to_string()),
+                            &code_sample,
+                            &fix_suggestion,
+                            Some(file_path.to_string()),
+                        )
+                        .await
+                        {
                             Ok(filename) => {
                                 println!("   ✅ Bug stored: {}", filename);
                                 info!("Bug {} stored successfully: {}", bug_id, filename);
@@ -348,17 +406,20 @@ async fn analyze_adapter_files_for_bugs(state: &UnifiedServerState) -> Result<()
             println!("   ⚠️ DeepSeek client not available");
             warn!("Skipping analysis - DeepSeek client not initialized");
         }
-        
+
         // Add small delay to avoid rate limiting
         tokio::time::sleep(std::time::Duration::from_millis(500)).await;
     }
-    
+
     println!("\n📊 Bug analysis completed:");
     println!("   📄 Files analyzed: {}", files_analyzed);
     println!("   🐛 Bugs found: {}", bugs_found);
-    
-    info!("Bug analysis workflow completed: {} files analyzed, {} bugs found", files_analyzed, bugs_found);
-    
+
+    info!(
+        "Bug analysis workflow completed: {} files analyzed, {} bugs found",
+        files_analyzed, bugs_found
+    );
+
     Ok(())
 }
 
@@ -384,11 +445,16 @@ async fn store_bug_internal(
     adapter_name: Option<String>,
     code_sample: &str,
     fix_suggestion: &str,
+    file_path: Option<String>,
 ) -> Result<String> {
     let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S").to_string();
-    let adapter_suffix = adapter_name.as_ref().map(|s| format!("_{}", s)).unwrap_or_default();
-    let filename = format!("{}/{}{}_{}.json", config::Config::BUGS_DIRECTORY, bug_id, adapter_suffix, timestamp);
-    
+    let adapter_suffix = adapter_name
+        .as_ref()
+        .map(|s| format!("_{}", s))
+        .unwrap_or_default();
+    let bugs_dir = config::Config::bugs_directory_path();
+    let filename = bugs_dir.join(format!("{}{}_{}.json", bug_id, adapter_suffix, timestamp));
+
     let bug_data = serde_json::json!({
         "bug_id": bug_id,
         "severity": severity,
@@ -396,16 +462,17 @@ async fn store_bug_internal(
         "adapter_name": adapter_name,
         "code_sample": code_sample,
         "fix_suggestion": fix_suggestion,
+        "file_path": file_path,
         "timestamp": timestamp,
         "analysis_context": "Automated detection via Nautilus Trader Rig"
     });
-    
+
     // Ensure bugs directory exists
-    tokio::fs::create_dir_all(config::Config::BUGS_DIRECTORY).await?;
-    
+    tokio::fs::create_dir_all(&bugs_dir).await?;
+
     tokio::fs::write(&filename, serde_json::to_string_pretty(&bug_data)?).await?;
-    
-    Ok(filename)
+
+    Ok(filename.to_string_lossy().to_string())
 }
 
 // Function to test improvement analyzer
@@ -415,48 +482,55 @@ async fn run_rig_sqlite_application() -> Result<()> {
     println!("🎯 Starting Nautilus Trader Rig with FastEmbed and DeepSeek integration");
     println!("=======================================================================");
     debug!("Application startup initiated with comprehensive AI toolchain");
-    
+
     // Initialize state
     trace!("Beginning unified server state initialization");
     let state = UnifiedServerState::new().await?;
     info!("✅ Server state initialization completed");
-    
+
     // Test DeepSeek client functionality
     debug!("Starting DeepSeek client functionality tests");
     test_deepseek_client(&state).await?;
-    
+
     // Test vector search
     debug!("Starting vector similarity search tests");
     test_vector_search(&state).await?;
-    
+
     println!("\n✅ FastEmbed + DeepSeek integration test completed successfully!");
     info!("🎉 All integration tests passed successfully");
-    
+
     // Run automated bug analysis on discovered files
     debug!("Starting automated bug analysis on adapter files");
     analyze_adapter_files_for_bugs(&state).await?;
-    
+
     // Keep running for monitoring
     let mut interval = tokio::time::interval(Duration::from_secs(30));
-    
+
     println!("\n🔄 Running periodic monitoring (Ctrl+C to stop)...");
     info!("Starting periodic health monitoring with 30-second intervals");
     debug!("Monitoring will check vector store and AI client health");
-    
+
     loop {
         interval.tick().await;
         trace!("Executing periodic health check");
-        
+
         println!("\n⏰ Periodic check - FastEmbed and DeepSeek systems operational");
-        
+
         // Test vector search
         if let Some(vector_store) = &state.vector_store {
             let query = "security vulnerability";
             trace!("Testing vector store with query: '{}'", query);
             match vector_store.similarity_search(query, 1).await {
                 Ok(results) => {
-                    println!("   🔍 Vector search for '{}': {} results", query, results.len());
-                    debug!("Vector store health check successful, {} results returned", results.len());
+                    println!(
+                        "   🔍 Vector search for '{}': {} results",
+                        query,
+                        results.len()
+                    );
+                    debug!(
+                        "Vector store health check successful, {} results returned",
+                        results.len()
+                    );
                 }
                 Err(e) => {
                     println!("   ❌ Vector search error: {}", e);
@@ -466,14 +540,20 @@ async fn run_rig_sqlite_application() -> Result<()> {
         } else {
             debug!("Vector store not available during health check");
         }
-        
+
         // Test DeepSeek client
         if let Some(client) = &state.deepseek_client {
             trace!("Testing DeepSeek client health with simple prompt");
-            match client.prompt("Respond with just 'OK' to confirm you're working.").await {
+            match client
+                .prompt("Respond with just 'OK' to confirm you're working.")
+                .await
+            {
                 Ok(response) => {
                     println!("   🤖 DeepSeek client: {}", response.trim());
-                    debug!("DeepSeek health check successful, response: '{}'", response.trim());
+                    debug!(
+                        "DeepSeek health check successful, response: '{}'",
+                        response.trim()
+                    );
                 }
                 Err(e) => {
                     println!("   ❌ DeepSeek client error: {}", e);
@@ -489,8 +569,20 @@ async fn run_rig_sqlite_application() -> Result<()> {
 #[tokio::main]
 async fn main() -> Result<()> {
     // Load environment variables from .env file FIRST (before any client initialization)
-    dotenvy::from_path(Config::ENV_FILE_PATH).ok(); // Load from configured path
-    
+    // Try absolute path first, then relative paths
+    let env_paths = [
+        Config::manifest_dir().join(".env"),
+        std::path::Path::new(".env").to_path_buf(),
+        std::path::Path::new("nautilus-trader-rig/.env").to_path_buf(),
+    ];
+
+    for env_path in &env_paths {
+        if env_path.exists() {
+            dotenvy::from_path(env_path).ok();
+            break;
+        }
+    }
+
     // Initialize centralized logging system
     init_dev_logging()?;
 
@@ -505,15 +597,15 @@ async fn main() -> Result<()> {
 
     info!("🚀 Starting Nautilus Trader Rig with MCP server...");
     debug!("Application entry point - initializing concurrent services");
-    
+
     // Check configuration paths at startup
     log_status!(info, "Validating configuration paths");
-    let rust_dirs = Config::all_rust_adapter_directories();
+    let rust_dirs = Config::all_rust_adapter_directories_abs();
     for (i, dir) in rust_dirs.iter().enumerate() {
         let exists = dir.exists();
         let status = if exists { "Found" } else { "Missing" };
         log_directory_op!(info, format!("Path {} check", i + 1), dir, status);
-        
+
         if exists {
             if let Ok(entries) = std::fs::read_dir(dir) {
                 let adapter_count = entries.count();
@@ -521,7 +613,7 @@ async fn main() -> Result<()> {
             }
         }
     }
-    
+
     // Count total Rust files available
     let mut total_rust_files = 0;
     for rust_dir in rust_dirs {
@@ -535,7 +627,11 @@ async fn main() -> Result<()> {
                                 if let Some(ext) = src_entry.path().extension() {
                                     if ext == "rs" {
                                         total_rust_files += 1;
-                                        log_file_processing!(debug, "Found Rust file", src_entry.path().display());
+                                        log_file_processing!(
+                                            debug,
+                                            "Found Rust file",
+                                            src_entry.path().display()
+                                        );
                                     }
                                 }
                             }
@@ -545,8 +641,11 @@ async fn main() -> Result<()> {
             }
         }
     }
-    log_status!(info, format!("Total Rust adapter files available: {}", total_rust_files));
-    
+    log_status!(
+        info,
+        format!("Total Rust adapter files available: {}", total_rust_files)
+    );
+
     // Start MCP server on a separate thread
     debug!("Spawning MCP server on background thread");
     let _mcp_handle = tokio::spawn(async {
@@ -564,7 +663,7 @@ async fn main() -> Result<()> {
         error!("❌ Main application failed: {}", e);
         return Err(e);
     }
-    
+
     info!("✅ Application shutdown complete");
     Ok(())
 }

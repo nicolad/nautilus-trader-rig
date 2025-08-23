@@ -1,0 +1,10 @@
+{
+  "adapter_name": "parse",
+  "analysis_context": "Automated detection via Nautilus Trader Rig",
+  "bug_id": "AUTO_BUG_parse_8_150334",
+  "code_sample": "See file content",
+  "description": "The `parse_bar_spec` function contains multiple critical issues:",
+  "fix_suggestion": "Use decimal arithmetic (e.g., `rust_decimal` crate) instead of floating-point for financial calculations to avoid precision errors that could cause financial losses.",
+  "severity": "CRITICAL",
+  "timestamp": "20250823_150334"
+}

@@ -1,0 +1,10 @@
+{
+  "adapter_name": "common",
+  "analysis_context": "Automated detection via Nautilus Trader Rig",
+  "bug_id": "AUTO_BUG_common_18_150948",
+  "code_sample": "See file content",
+  "description": "The function `get_date_time_range` contains a critical integer overflow vulnerability when converting `u64` Unix nanoseconds to `i128`. The `as_u64()` method returns a `u64` value, but when converting to `i128` using `i128::from()`, there's no overflow protection. If the UnixNanos value exceeds `i64::MAX` (which is 9,223,372,036,854,775,807 nanoseconds, equivalent to approximately 292 years since epoch), the conversion to `i128` will succeed but the resulting value will be too large for `OffsetDateTime::from_unix_timestamp_nanos()`, which expects a valid timestamp. This could lead to panics, incorrect datetime calculations, or undefined behavior in financial trading systems, potentially causing significant financial losses due to incorrect time-based calculations.",
+  "fix_suggestion": "Manual review required",
+  "severity": "CRITICAL",
+  "timestamp": "20250823_150948"
+}

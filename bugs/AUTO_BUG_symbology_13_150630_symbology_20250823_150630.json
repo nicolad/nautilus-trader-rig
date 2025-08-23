@@ -1,0 +1,10 @@
+{
+  "adapter_name": "symbology",
+  "analysis_context": "Automated detection via Nautilus Trader Rig",
+  "bug_id": "AUTO_BUG_symbology_13_150630",
+  "code_sample": "",
+  "description": "The `instrument_id_to_symbol_string` function has a critical logic error where it inserts the instrument's venue into the symbol_venue_map but then ignores the return value (which indicates whether the entry was newly inserted or already existed). This creates a race condition where multiple threads could be updating the same symbol with different venues, leading to inconsistent venue mappings. In financial trading systems, incorrect venue mapping could result in trades being routed to the wrong exchange or incorrect market data interpretation, potentially causing significant financial losses.",
+  "fix_suggestion": "The function should either:",
+  "severity": "HIGH",
+  "timestamp": "20250823_150630"
+}

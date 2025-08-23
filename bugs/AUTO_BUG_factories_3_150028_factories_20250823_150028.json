@@ -1,0 +1,10 @@
+{
+  "adapter_name": "factories",
+  "analysis_context": "Automated detection via Nautilus Trader Rig",
+  "bug_id": "AUTO_BUG_factories_3_150028",
+  "code_sample": "See file content",
+  "description": "The code has a potential error handling issue where the `create` method clones the entire `BlockchainDataClientConfig` without checking if the clone operation might fail (e.g., due to resource constraints or invalid state). While Rust's `Clone` trait typically doesn't fail, if `BlockchainDataClientConfig` contains complex or custom types that could panic during cloning (e.g., if it holds large data structures or external resources), this could lead to a panic in production. In a financial/trading context, such panics could disrupt data client initialization and cause missed market data or trading opportunities.",
+  "fix_suggestion": "Consider using `try_clone()` if the configuration implements it, or ensure that all fields in `BlockchainDataClientConfig` are trivially cloneable and won't panic. Alternatively, wrap the clone in a `catch_unwind` if the configuration might be complex, though this is generally not idiomatic in Rust. Review the `BlockchainDataClientConfig` type to guarantee safe cloning.",
+  "severity": "MEDIUM",
+  "timestamp": "20250823_150028"
+}

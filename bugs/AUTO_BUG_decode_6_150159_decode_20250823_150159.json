@@ -1,0 +1,10 @@
+{
+  "adapter_name": "decode",
+  "analysis_context": "Automated detection via Nautilus Trader Rig",
+  "bug_id": "AUTO_BUG_decode_6_150159",
+  "code_sample": "",
+  "description": "The code contains a critical financial calculation issue with precision loss when converting U256 values with decimals != 18. The floating-point conversion path (convert_u256_to_f64) can lead to precision loss, rounding errors, and potential financial miscalculations. For financial applications dealing with cryptocurrency values, even small precision errors can accumulate to significant monetary losses. Additionally, the clamping of precision to FIXED_PRECISION may result in unexpected truncation of significant digits.",
+  "fix_suggestion": "For non-18 decimal cases, implement a decimal-aware conversion that preserves precision without floating-point intermediate representation. Use integer arithmetic with proper scaling, or implement a custom decimal type that can handle arbitrary precision. Consider using the `rust-decimal` crate or similar for precise decimal arithmetic. If floating-point conversion is absolutely necessary, document the precision limitations clearly and implement bounds checking to ensure values don't exceed f64 precision limits.",
+  "severity": "HIGH",
+  "timestamp": "20250823_150159"
+}

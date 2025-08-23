@@ -1,0 +1,10 @@
+{
+  "adapter_name": "data",
+  "analysis_context": "Automated detection via Nautilus Trader Rig",
+  "bug_id": "AUTO_BUG_data_14_150721",
+  "code_sample": "See file content",
+  "description": "Multiple critical issues found:",
+  "fix_suggestion": "Manual review required",
+  "severity": "HIGH",
+  "timestamp": "20250823_150721"
+}

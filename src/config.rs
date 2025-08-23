@@ -8,14 +8,14 @@ use std::path::Path;
 pub struct Config;
 
 impl Config {
-    /// Path to the environment file
-    pub const ENV_FILE_PATH: &'static str = "nautilus-trader-rig/.env";
+    /// Path to the environment file (relative to crate dir)
+    pub const ENV_FILE_PATH: &'static str = ".env";
     
     /// Default MCP server port
     pub const DEFAULT_MCP_PORT: u16 = 3000;
     
-    /// Default bugs directory (explicit path to ensure correctness regardless of CWD)
-    pub const BUGS_DIRECTORY: &'static str = "nautilus-trader-rig/bugs";
+    /// Default bugs directory (relative name; use bugs_directory_path() for absolute)
+    pub const BUGS_DIRECTORY: &'static str = "bugs";
     
     /// Default logs directory
     pub const LOGS_DIRECTORY: &'static str = "logs";
@@ -34,7 +34,7 @@ impl Config {
     
     /// Vector similarity search limit
     pub const DEFAULT_SEARCH_LIMIT: usize = 10;
-    ``
+    
     /// DeepSeek model name
     pub const DEEPSEEK_MODEL: &'static str = "deepseek-chat";
     
