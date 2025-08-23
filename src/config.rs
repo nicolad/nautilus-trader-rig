@@ -14,8 +14,8 @@ impl Config {
     /// Default MCP server port
     pub const DEFAULT_MCP_PORT: u16 = 3000;
     
-    /// Default bugs directory
-    pub const BUGS_DIRECTORY: &'static str = "bugs";
+    /// Default bugs directory (explicit path to ensure correctness regardless of CWD)
+    pub const BUGS_DIRECTORY: &'static str = "nautilus-trader-rig/bugs";
     
     /// Default logs directory
     pub const LOGS_DIRECTORY: &'static str = "logs";
@@ -24,14 +24,17 @@ impl Config {
     pub const ADAPTERS_DIRECTORY: &'static str = "../nautilus_trader/adapters";
     
     /// Core Rust adapters directory
-    pub const CORE_ADAPTERS_DIRECTORY: &'static str = "./crates/adapters";
+    /// Note: This path is relative to the nautilus-trader-rig crate directory.
+    /// The adapters live at the repo root under `crates/adapters`, so from
+    /// within `nautilus-trader-rig/` we must go up one level.
+    pub const CORE_ADAPTERS_DIRECTORY: &'static str = "../crates/adapters";
     
-    /// Rust adapter file patterns
-    pub const RUST_FILE_EXTENSIONS: &'static [&'static str] = &["*.rs"];
+    /// Rust adapter file extensions (without leading dot)
+    pub const RUST_FILE_EXTENSIONS: &'static [&'static str] = &["rs"];
     
     /// Vector similarity search limit
     pub const DEFAULT_SEARCH_LIMIT: usize = 10;
-    
+    ``
     /// DeepSeek model name
     pub const DEEPSEEK_MODEL: &'static str = "deepseek-chat";
     
@@ -40,6 +43,11 @@ impl Config {
 }
 
 impl Config {
+    /// Absolute path to this crate's directory at compile time
+    pub fn manifest_dir() -> &'static Path {
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+    }
+    
     /// Get the full path to the environment file
     pub fn env_file_path() -> &'static Path {
         Path::new(Self::ENV_FILE_PATH)
@@ -53,6 +61,11 @@ impl Config {
     /// Get the full path to the logs directory
     pub fn logs_directory() -> &'static Path {
         Path::new(Self::LOGS_DIRECTORY)
+    }
+    
+    /// Absolute bugs directory path, independent of current working directory
+    pub fn bugs_directory_path() -> std::path::PathBuf {
+        Self::manifest_dir().join("bugs")
     }
     
     /// Check if environment file exists
@@ -73,7 +86,7 @@ impl Config {
     /// Generate a log file path with timestamp
     pub fn generate_log_file_path() -> std::path::PathBuf {
         let timestamp = chrono::Utc::now().format("%Y-%m-%d_%H-%M-%S").to_string();
-        Self::logs_directory().join(format!("nautilus_trader_rig_{}.log", timestamp))
+    Self::logs_directory().join(format!("nautilus_trader_rig_{}.log", timestamp))
     }
     
     /// Get the full path to the Rust adapters directory
@@ -83,7 +96,7 @@ impl Config {
     
     /// Get the full path to the Rust core directory
     pub fn rust_core_directory() -> &'static Path {
-        Path::new(Self::CORE_ADAPTERS_DIRECTORY)
+    Path::new(Self::CORE_ADAPTERS_DIRECTORY)
     }
     
     /// Check if Rust adapters directory exists
@@ -102,6 +115,20 @@ impl Config {
             Self::rust_adapters_directory(),
             Self::rust_core_directory(),
         ]
+    }
+
+    /// Absolute paths for Rust adapter directories (preferred for robust execution)
+    pub fn all_rust_adapter_directories_abs() -> Vec<std::path::PathBuf> {
+        let base = Self::manifest_dir();
+        vec![
+            base.join("../crates/adapters"),
+            base.join("../crates/adapters"), // kept twice to mirror existing API semantics
+        ]
+    }
+    
+    /// Absolute path to core adapters directory
+    pub fn core_adapters_directory_abs() -> std::path::PathBuf {
+        Self::manifest_dir().join("../crates/adapters")
     }
     
     /// Get list of supported Rust file extensions
