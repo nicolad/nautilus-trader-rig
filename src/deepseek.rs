@@ -11,13 +11,14 @@ use rig::prelude::*;
 use rig::providers;
 
 /// DeepSeek client using rig framework
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct DeepSeekClient {
     client: providers::deepseek::Client,
 }
 
 impl DeepSeekClient {
     /// Create a new DeepSeek client with the provided API key
+    #[allow(dead_code)]
     pub fn new(api_key: String) -> Self {
         let client = providers::deepseek::Client::new(&api_key);
         Self { client }
@@ -32,12 +33,14 @@ impl DeepSeekClient {
     }
 
     /// Send a simple prompt and get the complete response
+    #[allow(dead_code)]
     pub async fn prompt(&self, prompt: &str) -> Result<String> {
         self.prompt_with_context(prompt, "Nautilus-Autopatcher")
             .await
     }
 
     /// Send a prompt with a specific context/agent name
+    #[allow(dead_code)]
     pub async fn prompt_with_context(&self, prompt: &str, agent_name: &str) -> Result<String> {
         log::info!("🤖 Initializing agent: {}", agent_name);
 
@@ -85,13 +88,37 @@ impl DeepSeekClient {
         Ok(response)
     }
 
+    /// Send a prompt for critical code analysis with appropriate context
+    pub async fn analyze_code(&self, prompt: &str) -> Result<String> {
+        log::info!("🔍 Starting critical code analysis with DeepSeek");
+        
+        let agent = self
+            .client
+            .agent(providers::deepseek::DEEPSEEK_CHAT)
+            .preamble(
+                "You are an expert critical code analyst specializing in security vulnerabilities, \
+                 reliability issues, financial calculation errors, and performance problems. \
+                 You identify critical issues that could impact system stability, security, or correctness."
+            )
+            .name("Critical-Code-Analyzer")
+            .build();
+
+        log::debug!("📤 Sending critical code analysis prompt: {} chars", prompt.len());
+        let response = agent.prompt(prompt).await?;
+        log::info!("📥 Received critical code analysis response: {} chars", response.len());
+
+        Ok(response)
+    }
+
     /// Stream a prompt and get real-time response (simplified for now)
+    #[allow(dead_code)]
     pub async fn stream_prompt(&self, prompt: &str) -> Result<String> {
         self.stream_prompt_with_context(prompt, "Nautilus-Autopatcher-Stream")
             .await
     }
 
     /// Stream a prompt with a specific context/agent name
+    #[allow(dead_code)]
     pub async fn stream_prompt_with_context(
         &self,
         prompt: &str,
@@ -109,6 +136,7 @@ impl DeepSeekClient {
     }
 
     /// Validate that the client can connect to DeepSeek API
+    #[allow(dead_code)]
     pub async fn validate_connection(&self) -> Result<()> {
         log::info!("🔌 Validating DeepSeek API connection");
         
@@ -204,7 +232,7 @@ mod tests {
         // Test that we can create a client with a test key
         std::env::set_var("DEEPSEEK_API_KEY", "test-key-for-creation");
         
-        let result = DeepSeekClient::new().await;
+        let result = DeepSeekClient::from_env();
         
         // Should succeed in creating the client (even with fake key)
         assert!(result.is_ok());

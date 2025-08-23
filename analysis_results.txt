@@ -1,0 +1,125 @@
+warning: fields `rust_patterns`, `python_patterns`, `naming_rules`, `architectural_rules`, and `commit_history` are never read
+   --> src/code_analyzer.rs:135:5
+    |
+133 | pub struct CodeAnalyzer {
+    |            ------------ fields in this struct
+134 |     // Pattern matchers for different languages
+135 |     rust_patterns: RustPatterns,
+    |     ^^^^^^^^^^^^^
+136 |     python_patterns: PythonPatterns,
+    |     ^^^^^^^^^^^^^^^
+...
+139 |     naming_rules: NamingRules,
+    |     ^^^^^^^^^^^^
+140 |     architectural_rules: ArchitecturalRules,
+    |     ^^^^^^^^^^^^^^^^^^^
+...
+143 |     commit_history: Vec<HistoricalPattern>,
+    |     ^^^^^^^^^^^^^^
+    |
+    = note: `CodeAnalyzer` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+    = note: `#[warn(dead_code)]` on by default
+
+warning: fields `error_handling`, `naming_conventions`, `unsafe_patterns`, and `performance_patterns` are never read
+   --> src/code_analyzer.rs:151:5
+    |
+150 | struct RustPatterns {
+    |        ------------ fields in this struct
+151 |     error_handling: Vec<Regex>,
+    |     ^^^^^^^^^^^^^^
+152 |     naming_conventions: Vec<Regex>,
+    |     ^^^^^^^^^^^^^^^^^^
+153 |     unsafe_patterns: Vec<Regex>,
+    |     ^^^^^^^^^^^^^^^
+154 |     performance_patterns: Vec<Regex>,
+    |     ^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `RustPatterns` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: fields `import_patterns`, `exception_handling`, `naming_conventions`, and `performance_patterns` are never read
+   --> src/code_analyzer.rs:159:5
+    |
+158 | struct PythonPatterns {
+    |        -------------- fields in this struct
+159 |     import_patterns: Vec<Regex>,
+    |     ^^^^^^^^^^^^^^^
+160 |     exception_handling: Vec<Regex>,
+    |     ^^^^^^^^^^^^^^^^^^
+161 |     naming_conventions: Vec<Regex>,
+    |     ^^^^^^^^^^^^^^^^^^
+162 |     performance_patterns: Vec<Regex>,
+    |     ^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `PythonPatterns` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: fields `rust_struct_naming`, `rust_function_naming`, `python_class_naming`, `python_function_naming`, and `file_naming` are never read
+   --> src/code_analyzer.rs:167:5
+    |
+166 | struct NamingRules {
+    |        ----------- fields in this struct
+167 |     rust_struct_naming: Regex,
+    |     ^^^^^^^^^^^^^^^^^^
+168 |     rust_function_naming: Regex,
+    |     ^^^^^^^^^^^^^^^^^^^^
+169 |     python_class_naming: Regex,
+    |     ^^^^^^^^^^^^^^^^^^^
+170 |     python_function_naming: Regex,
+    |     ^^^^^^^^^^^^^^^^^^^^^^
+171 |     file_naming: HashMap<String, Regex>,
+    |     ^^^^^^^^^^^
+    |
+    = note: `NamingRules` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: fields `allowed_dependencies`, `forbidden_patterns`, and `layer_rules` are never read
+   --> src/code_analyzer.rs:176:5
+    |
+175 | struct ArchitecturalRules {
+    |        ------------------ fields in this struct
+176 |     allowed_dependencies: HashMap<String, Vec<String>>,
+    |     ^^^^^^^^^^^^^^^^^^^^
+177 |     forbidden_patterns: Vec<Regex>,
+    |     ^^^^^^^^^^^^^^^^^^
+178 |     layer_rules: HashMap<String, Vec<String>>,
+    |     ^^^^^^^^^^^
+    |
+    = note: `ArchitecturalRules` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: fields `author`, `component`, `common_patterns`, and `typical_change_size` are never read
+   --> src/code_analyzer.rs:183:5
+    |
+182 | struct HistoricalPattern {
+    |        ----------------- fields in this struct
+183 |     author: String,
+    |     ^^^^^^
+184 |     component: String,
+    |     ^^^^^^^^^
+185 |     common_patterns: Vec<String>,
+    |     ^^^^^^^^^^^^^^^
+186 |     typical_change_size: (u32, u32), // (min_lines, max_lines)
+    |     ^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `HistoricalPattern` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: method `analyze_commits` is never used
+  --> src/deepseek.rs:70:18
+   |
+19 | impl DeepSeekClient {
+   | ------------------- method in this implementation
+...
+70 |     pub async fn analyze_commits(&self, prompt: &str) -> Result<String> {
+   |                  ^^^^^^^^^^^^^^^
+
+warning: `nautilus_trader_rig` (bin "nautilus_trader_rig") generated 7 warnings
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.15s
+     Running `target/debug/nautilus_trader_rig --count 100`
+🔍 Running Advanced Code Consistency Analyzer...
+🔍 Analyzing last 20 commits for code patterns and consistency...
+🔧 Initializing Advanced Code Consistency Analyzer...
+🤖 DeepSeek AI enabled for criticality analysis
+🔍 Fetching 20 most recent commits...
+📊 Analyzing commit 1/20: ef80d3fb (Chris Sellers)
+🤖 Enhancing analysis with DeepSeek AI...
+📊 Analyzing commit 2/20: ee2e3aac (Chris Sellers)
+🤖 Enhancing analysis with DeepSeek AI...
+📊 Analyzing commit 3/20: fc5cc08b (Chris Sellers)
+🤖 Enhancing analysis with DeepSeek AI...

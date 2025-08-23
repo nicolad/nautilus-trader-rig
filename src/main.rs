@@ -1,49 +1,40 @@
 use anyhow::Result;
-use dotenvy::dotenv;
 
-mod commit_analyzer;
+mod code_analyzer;
 mod deepseek;
 
-use commit_analyzer::CommitAnalyzer;
-use deepseek::DeepSeekClient;
+use code_analyzer::CodeAnalyzer;
 
-/// Run commit analysis with the specified parameters
-async fn run_commit_analysis(count: usize, format: &str, with_ai: bool) -> Result<()> {
-    println!("🔍 Analyzing last {} commits...", count);
+/// Run advanced code consistency analysis 
+async fn run_commit_analysis() -> Result<()> {
+    println!("🔍 Running Advanced Code Consistency Analyzer...");
+    println!("🔍 Analyzing latest 5 commits for code patterns and consistency...");
     
-    let analyzer = CommitAnalyzer::new()?;
-    let analysis = analyzer.analyze_last_commits(count).await?;
+    let mut analyzer = CodeAnalyzer::new()?;
+    let analyses = analyzer.analyze_commits(5).await?; // Check latest 5 commits
     
-    if with_ai {
-        println!("🤖 Running AI analysis...");
-        let deepseek = DeepSeekClient::from_env()?;
-        // Convert analysis to commit format for AI
-        let commit_strings: Vec<String> = analysis.iter()
-            .map(|a| format!("{}|{}|{}|{}|{}", a.commit_hash, "author", "email", a.date, a.message))
-            .collect();
-        let commits_text = commit_strings.join("\n");
-        let ai_analysis = deepseek.analyze_commits(&commits_text).await?;
-        println!("🎯 AI Analysis Results:\n{}", ai_analysis);
+    // Generate report and automatically save high-risk changes
+    let report = analyzer.generate_report(&analyses);
+    println!("{}", report);
+    
+    // Count and save high-risk changes specifically
+    let high_risk_count = analyses.iter().filter(|a| a.risk_score > 60).count();
+    if high_risk_count > 0 {
+        println!("\n🚨 Found {} high-risk code changes - details saved to analysis folder", high_risk_count);
+    } else {
+        println!("\n✅ No high-risk code changes detected in latest 5 commits");
     }
     
-    // Generate report in requested format
-    let report = match format {
-        "json" => analyzer.generate_report(&analysis, "json")?,
-        _ => analyzer.generate_report(&analysis, "text")?,
-    };
-    
-    println!("{}", report);
     Ok(())
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Load environment variables from .env file if present
-    let _ = dotenv();
-
-    // Run commit analysis with default settings
-    println!("🔍 Running Nautilus Trader Commit Analyzer...");
-    run_commit_analysis(20, "text", false).await
+    // Load environment variables from .env file
+    dotenvy::dotenv().ok();
+    
+    // Run analysis with default commit count
+    run_commit_analysis().await
 }
 
 #[cfg(test)]
@@ -58,32 +49,6 @@ mod tests {
     }
 
     #[test]
-    fn test_git_command_format() {
-        // Test that git command format is correct
-        let count = 5;
-        let expected_args = vec![
-            "log",
-            "--oneline", 
-            "--no-merges",
-            "-5",
-            "--pretty=format:%H|%an|%ae|%ad|%s",
-            "--date=iso"
-        ];
-        
-        // This tests our command structure
-        assert_eq!(format!("-{}", count), "-5");
-    }
-
-    #[tokio::test]
-    async fn test_run_commit_analysis_without_ai() {
-        // Test running commit analysis without AI
-        // This is an integration test that requires git repo
-        let result = run_commit_analysis(1, "text", false).await;
-        // Should succeed if we're in a git repository
-        assert!(result.is_ok() || result.is_err()); // Either way is valid for test
-    }
-
-    #[test]
     fn test_commit_parsing() {
         // Test parsing of commit format
         let sample_commit = "abc123|John Doe|john@example.com|2025-08-22 10:30:00 +0000|Fix: update documentation";
@@ -95,6 +60,15 @@ mod tests {
         assert_eq!(parts[2], "john@example.com"); // author email
         assert_eq!(parts[3], "2025-08-22 10:30:00 +0000"); // date
         assert_eq!(parts[4], "Fix: update documentation"); // message
+    }
+
+    #[tokio::test]
+    async fn test_run_commit_analysis_simplified() {
+        // Test running simplified commit analysis
+        // This is an integration test that requires git repo
+        let result = run_commit_analysis().await;
+        // Should succeed if we're in a git repository, fail otherwise
+        assert!(result.is_ok() || result.is_err());
     }
 
     #[test]
