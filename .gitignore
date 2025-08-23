@@ -17,7 +17,7 @@
 # Editors/IDEs
 .vscode/
 .idea/
-
+.fastembed_cache
 # Env files
 .env
 .env.*
