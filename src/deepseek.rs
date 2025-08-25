@@ -6,12 +6,12 @@
 // for consistent AI interactions across the application.
 
 use anyhow::{anyhow, Result};
+use rig::client::{CompletionClient, ProviderClient};
 use rig::completion::Prompt;
 use rig::providers::deepseek;
-use rig::client::{CompletionClient, ProviderClient};
 use serde::{Deserialize, Serialize};
 use std::env;
-use tracing::{info, debug};
+use tracing::{debug, info};
 
 /// DeepSeek client using rig framework
 #[derive(Clone, Debug)]
@@ -39,9 +39,7 @@ impl DeepSeekClient {
                 let client = deepseek::Client::from_env();
                 Ok(Self { client })
             }
-            Err(_) => {
-                Err(anyhow!("DEEPSEEK_API_KEY environment variable not set"))
-            }
+            Err(_) => Err(anyhow!("DEEPSEEK_API_KEY environment variable not set")),
         }
     }
 
@@ -82,29 +80,36 @@ impl DeepSeekClient {
     /// Send a prompt for commit analysis with appropriate context
     pub async fn analyze_commits(&self, prompt: &str) -> Result<String> {
         log::info!("🔍 Starting commit analysis with DeepSeek");
-        
+
         let agent = self
             .client
             .agent(deepseek::DEEPSEEK_CHAT)
             .preamble(
                 "You are an expert code quality analyst specializing in commit message analysis, \
                  typo detection, and pattern consistency. You help identify inconsistencies, \
-                 typos, and violations of established commit patterns in software repositories."
+                 typos, and violations of established commit patterns in software repositories.",
             )
             .name("Commit-Quality-Analyzer")
             .build();
 
         log::debug!("📤 Sending commit analysis prompt: {} chars", prompt.len());
         let response = agent.prompt(prompt).await?;
-        log::info!("📥 Received commit analysis response: {} chars", response.len());
+        log::info!(
+            "📥 Received commit analysis response: {} chars",
+            response.len()
+        );
 
         Ok(response)
     }
 
     /// Analyze critical bugs and create tests to reproduce criticality
-    pub async fn confirm_critical_bug(&self, bug_description: &str, code_sample: &str) -> Result<String> {
+    pub async fn confirm_critical_bug(
+        &self,
+        bug_description: &str,
+        code_sample: &str,
+    ) -> Result<String> {
         log::info!("🔍 Confirming critical bug with DeepSeek");
-        
+
         let agent = self
             .client
             .agent(deepseek::DEEPSEEK_CHAT)
@@ -148,9 +153,15 @@ impl DeepSeekClient {
             bug_description, code_sample
         );
 
-        log::debug!("📤 Sending critical bug confirmation prompt: {} chars", prompt.len());
+        log::debug!(
+            "📤 Sending critical bug confirmation prompt: {} chars",
+            prompt.len()
+        );
         let response = agent.prompt(&prompt).await?;
-        log::info!("📥 Received critical bug confirmation: {} chars", response.len());
+        log::info!(
+            "📥 Received critical bug confirmation: {} chars",
+            response.len()
+        );
 
         Ok(response)
     }
@@ -158,7 +169,7 @@ impl DeepSeekClient {
     /// Send a prompt for critical code analysis with appropriate context
     pub async fn analyze_code(&self, prompt: &str) -> Result<String> {
         log::info!("🔍 Starting critical code analysis with DeepSeek");
-        
+
         let agent = self
             .client
             .agent(deepseek::DEEPSEEK_CHAT)
@@ -170,9 +181,15 @@ impl DeepSeekClient {
             .name("Critical-Code-Analyzer")
             .build();
 
-        log::debug!("📤 Sending critical code analysis prompt: {} chars", prompt.len());
+        log::debug!(
+            "📤 Sending critical code analysis prompt: {} chars",
+            prompt.len()
+        );
         let response = agent.prompt(prompt).await?;
-        log::info!("📥 Received critical code analysis response: {} chars", response.len());
+        log::info!(
+            "📥 Received critical code analysis response: {} chars",
+            response.len()
+        );
 
         Ok(response)
     }
@@ -206,15 +223,19 @@ impl DeepSeekClient {
     #[allow(dead_code)]
     pub async fn validate_connection(&self) -> Result<()> {
         log::info!("🔌 Validating DeepSeek API connection");
-        
+
         let test_prompt = "Reply with 'OK' if you can receive this message.";
-        let response = self.prompt_with_context(test_prompt, "Connection-Test").await?;
-        
+        let response = self
+            .prompt_with_context(test_prompt, "Connection-Test")
+            .await?;
+
         if response.trim().to_uppercase().contains("OK") {
             log::info!("✅ DeepSeek API connection validated successfully");
             Ok(())
         } else {
-            Err(anyhow!("DeepSeek API connection validation failed: unexpected response"))
+            Err(anyhow!(
+                "DeepSeek API connection validation failed: unexpected response"
+            ))
         }
     }
 }
@@ -262,9 +283,9 @@ impl DeepSeekEmbeddingClient {
     pub fn new() -> Result<Self> {
         let api_key = env::var("DEEPSEEK_API_KEY")
             .map_err(|_| anyhow!("DEEPSEEK_API_KEY environment variable not set"))?;
-        
+
         let client = reqwest::Client::new();
-        
+
         Ok(Self {
             client,
             api_key,
@@ -272,45 +293,53 @@ impl DeepSeekEmbeddingClient {
             model: "text-embedding-ada-002".to_string(), // DeepSeek's embedding model
         })
     }
-    
+
     pub async fn embed_texts(&self, texts: Vec<String>) -> Result<Vec<Vec<f32>>> {
         let request = DeepSeekEmbeddingRequest {
             model: self.model.clone(),
             input: texts,
         };
-        
-        debug!("Making DeepSeek embedding request for {} texts", request.input.len());
-        
-        let response = self.client
+
+        debug!(
+            "Making DeepSeek embedding request for {} texts",
+            request.input.len()
+        );
+
+        let response = self
+            .client
             .post(format!("{}/embeddings", self.base_url))
             .header("Authorization", format!("Bearer {}", self.api_key))
             .header("Content-Type", "application/json")
             .json(&request)
             .send()
             .await?;
-        
+
         if !response.status().is_success() {
             let error_text = response.text().await?;
             return Err(anyhow!("DeepSeek API error: {}", error_text));
         }
-        
+
         let embedding_response: DeepSeekEmbeddingResponse = response.json().await?;
-        
-        info!("DeepSeek embedding token usage: {} prompt tokens, {} total tokens", 
-              embedding_response.usage.prompt_tokens, 
-              embedding_response.usage.total_tokens);
-        
-        let embeddings = embedding_response.data
+
+        info!(
+            "DeepSeek embedding token usage: {} prompt tokens, {} total tokens",
+            embedding_response.usage.prompt_tokens, embedding_response.usage.total_tokens
+        );
+
+        let embeddings = embedding_response
+            .data
             .into_iter()
             .map(|data| data.embedding)
             .collect();
-        
+
         Ok(embeddings)
     }
-    
+
     pub async fn embed_text(&self, text: String) -> Result<Vec<f32>> {
         let embeddings = self.embed_texts(vec![text]).await?;
-        embeddings.into_iter().next()
+        embeddings
+            .into_iter()
+            .next()
             .ok_or_else(|| anyhow!("No embedding returned from DeepSeek API"))
     }
 }
@@ -321,15 +350,15 @@ mod tests {
 
     #[test]
     fn test_deepseek_client_creation() {
-    let _client = DeepSeekClient::new("test-api-key".to_string());
-    // Just test that we can create the client without panicking
+        let _client = DeepSeekClient::new("test-api-key".to_string());
+        // Just test that we can create the client without panicking
     }
 
     #[tokio::test]
     async fn test_deepseek_client_from_env_missing_key() {
         // Remove the env var if it exists for this test
         std::env::remove_var("DEEPSEEK_API_KEY");
-        
+
         let result = DeepSeekClient::from_env();
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("DEEPSEEK_API_KEY"));
@@ -338,24 +367,28 @@ mod tests {
     #[test]
     fn test_deepseek_client_from_env_with_key() {
         std::env::set_var("DEEPSEEK_API_KEY", "test-key");
-        
+
         let result = DeepSeekClient::from_env();
         assert!(result.is_ok());
-        
+
         // Clean up
         std::env::remove_var("DEEPSEEK_API_KEY");
     }
 
     #[test]
     fn test_analyze_commits_prompt_format() {
-        let commits = ["abc123|John Doe|john@example.com|2025-08-22 10:30:00 +0000|feat: add new feature".to_string(),
-            "def456|Jane Smith|jane@example.com|2025-08-22 11:30:00 +0000|fix: correct typo".to_string()];
-        
+        let commits = [
+            "abc123|John Doe|john@example.com|2025-08-22 10:30:00 +0000|feat: add new feature"
+                .to_string(),
+            "def456|Jane Smith|jane@example.com|2025-08-22 11:30:00 +0000|fix: correct typo"
+                .to_string(),
+        ];
+
         let prompt = format!(
             "Analyze these git commits for quality, consistency, and potential issues:\n\n{}",
             commits.join("\n")
         );
-        
+
         assert!(prompt.contains("feat: add new feature"));
         assert!(prompt.contains("fix: correct typo"));
         assert!(prompt.contains("Analyze these git commits"));
@@ -363,9 +396,10 @@ mod tests {
 
     #[test]
     fn test_commit_format_parsing() {
-        let commit = "abc123|John Doe|john@example.com|2025-08-22 10:30:00 +0000|feat: add new feature";
+        let commit =
+            "abc123|John Doe|john@example.com|2025-08-22 10:30:00 +0000|feat: add new feature";
         let parts: Vec<&str> = commit.split('|').collect();
-        
+
         assert_eq!(parts.len(), 5);
         assert_eq!(parts[0], "abc123");
         assert_eq!(parts[1], "John Doe");
@@ -381,7 +415,7 @@ mod tests {
             "Analyze these git commits for quality, consistency, and potential issues:\n\n{}",
             empty_commits.join("\n")
         );
-        
+
         assert!(prompt.contains("Analyze these git commits"));
         // Should handle empty list gracefully
         assert_eq!(empty_commits.len(), 0);
@@ -391,12 +425,12 @@ mod tests {
     async fn test_new_client_creation() {
         // Test that we can create a client with a test key
         std::env::set_var("DEEPSEEK_API_KEY", "test-key-for-creation");
-        
+
         let result = DeepSeekClient::from_env();
-        
+
         // Should succeed in creating the client (even with fake key)
         assert!(result.is_ok());
-        
+
         // Clean up
         std::env::remove_var("DEEPSEEK_API_KEY");
     }
@@ -404,12 +438,12 @@ mod tests {
     #[test]
     fn test_client_clone() {
         std::env::set_var("DEEPSEEK_API_KEY", "test-key");
-        
-    let client = DeepSeekClient::from_env().unwrap();
-    let _cloned_client = client.clone();
-        
-    // Both clients should be valid (this tests the Clone implementation)
-        
+
+        let client = DeepSeekClient::from_env().unwrap();
+        let _cloned_client = client.clone();
+
+        // Both clients should be valid (this tests the Clone implementation)
+
         std::env::remove_var("DEEPSEEK_API_KEY");
     }
 
