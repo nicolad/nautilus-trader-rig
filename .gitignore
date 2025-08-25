@@ -18,7 +18,40 @@
 .vscode/
 .idea/
 .fastembed_cache
+# FastEmbed/HF models cache
+.fastembed_cache/
+/models/
+
+# Databases and local state
+*.db
+*.sqlite
+*.sqlite3
+
 # Env files
 .env
 .env.*
-/target
+
+# Logs
+*.log
+
+# Editor/OS backups and swap files
+*~
+*.swp
+*.swo
+*.tmp
+*.bak
+
+# direnv
+.envrc
+.direnv/
+
+# IntelliJ module files
+*.iml
+
+# Certificates/keys (avoid committing secrets)
+*.pem
+*.key
+*.crt
+
+# Local analysis outputs
+analysis_results.txt
