@@ -26,7 +26,6 @@ use rmcp::{
 };
 use serde_json::json;
 use tokio::sync::Mutex;
-use chrono;
 
 use hyper_util::{
     rt::{TokioExecutor, TokioIo},
@@ -60,6 +59,7 @@ pub struct BugConfirmationRequest {
 }
 
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
+#[allow(dead_code)]
 pub struct AdapterAnalysisRequest {
     pub adapter_name: String,
     pub adapter_path: Option<String>,
@@ -435,7 +435,7 @@ impl NautilusMcpServer {
         let mut processed_files = Vec::new();
         
         for rust_dir in rust_directories {
-            let adapter_path = rust_dir.join(&adapter_name.to_lowercase());
+            let adapter_path = rust_dir.join(adapter_name.to_lowercase());
             log_directory_op!(debug, "Checking adapter directory", adapter_path);
             
             if adapter_path.exists() {
@@ -871,7 +871,7 @@ impl NautilusMcpServer {
         
         // Try to get git information
         if let Ok(output) = tokio::process::Command::new("git")
-            .args(&["branch", "--show-current"])
+            .args(["branch", "--show-current"])
             .output()
             .await 
         {
@@ -884,7 +884,7 @@ impl NautilusMcpServer {
         }
         
         if let Ok(output) = tokio::process::Command::new("git")
-            .args(&["rev-parse", "HEAD"])
+            .args(["rev-parse", "HEAD"])
             .output()
             .await 
         {
@@ -1090,6 +1090,7 @@ pub async fn run_mcp_server() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[allow(dead_code)]
 pub async fn test_mcp_client() -> anyhow::Result<()> {
     let transport =
         rmcp::transport::StreamableHttpClientTransport::from_uri("http://localhost:8080");

@@ -3,9 +3,7 @@
 // This implementation uses rig-sqlite for vector similarity search
 
 use anyhow::Result;
-use serde_json;
 use std::time::Duration;
-use tokio;
 use tracing::{debug, error, info, trace, warn};
 
 mod config;
@@ -180,12 +178,10 @@ async fn test_vector_search(state: &UnifiedServerState) -> Result<()> {
         debug!("Vector store available, proceeding with similarity search tests");
         println!("🔍 Testing vector similarity search with rig-sqlite...");
 
-        let test_queries = vec![
-            "authentication bypass vulnerability",
+        let test_queries = ["authentication bypass vulnerability",
             "websocket security issues",
             "rate limiting problems",
-            "memory leak",
-        ];
+            "memory leak"];
 
         debug!("Testing {} different search queries", test_queries.len());
 
@@ -677,7 +673,7 @@ fn find_code_in_file(file_content: &str, code_sample: &str) -> Option<usize> {
 // Helper function to get current git branch
 async fn get_git_branch() -> Option<String> {
     let output = tokio::process::Command::new("git")
-        .args(&["branch", "--show-current"])
+        .args(["branch", "--show-current"])
         .output()
         .await
         .ok()?;
@@ -694,7 +690,7 @@ async fn get_git_branch() -> Option<String> {
 // Helper function to get current git commit hash
 async fn get_git_commit_hash() -> Option<String> {
     let output = tokio::process::Command::new("git")
-        .args(&["rev-parse", "HEAD"])
+        .args(["rev-parse", "HEAD"])
         .output()
         .await
         .ok()?;

@@ -1,5 +1,5 @@
 //! Centralized logging configuration for Nautilus Trader Rig
-//! 
+//!
 //! This module provides consistent logging setup across all components with:
 //! - Structured logging with tracing
 //! - Environment-based log levels
@@ -8,17 +8,17 @@
 //! - Performance monitoring
 //! - Component-specific logging levels
 
+use crate::config::Config;
 use anyhow::Result;
 use std::path::Path;
 use tracing::{debug, info, Level};
-use tracing_subscriber::{fmt, EnvFilter};
-use crate::config::Config;
+use tracing_subscriber::EnvFilter;
 
 /// Log levels for different components
 #[derive(Debug, Clone)]
 pub enum LogLevel {
     Trace,
-    Debug, 
+    Debug,
     Info,
     Warn,
     Error,
@@ -48,6 +48,7 @@ pub struct LogConfig {
     /// Enable colored output (for development)
     pub colored: bool,
     /// Include timestamps
+    #[allow(dead_code)]
     pub timestamps: bool,
     /// Include source location (file:line)
     pub include_location: bool,
@@ -66,10 +67,10 @@ impl Default for LogConfig {
             include_location: true,
             component_levels: vec![
                 ("nautilus_trader_rig".to_string(), LogLevel::Info),
-                ("ort".to_string(), LogLevel::Warn),  // Reduce ONNX runtime noise
+                ("ort".to_string(), LogLevel::Warn), // Reduce ONNX runtime noise
                 ("hf_hub".to_string(), LogLevel::Info),
                 ("rig".to_string(), LogLevel::Info),
-                ("mcp".to_string(), LogLevel::Debug),  // Detailed MCP logging
+                ("mcp".to_string(), LogLevel::Debug), // Detailed MCP logging
                 ("config".to_string(), LogLevel::Debug),
                 ("vector_store".to_string(), LogLevel::Info),
                 ("deepseek".to_string(), LogLevel::Info),
@@ -118,19 +119,21 @@ impl LogConfig {
     /// Initialize the global tracing subscriber with dual output (console + file)
     pub fn init(self) -> Result<()> {
         use tracing_subscriber::layer::SubscriberExt;
-        use tracing_subscriber::Layer;
-        
+
         // Build the environment filter
-        let mut filter = EnvFilter::from_default_env()
-            .add_directive(format!("{}={}", 
-                env!("CARGO_PKG_NAME").replace('-', "_"), 
-                self.level_string()).parse()?);
+        let mut filter = EnvFilter::from_default_env().add_directive(
+            format!(
+                "{}={}",
+                env!("CARGO_PKG_NAME").replace('-', "_"),
+                self.level_string()
+            )
+            .parse()?,
+        );
 
         // Add component-specific filters
         for (component, level) in &self.component_levels {
-            filter = filter.add_directive(
-                format!("{}={}", component, level_string(level)).parse()?
-            );
+            filter =
+                filter.add_directive(format!("{}={}", component, level_string(level)).parse()?);
         }
 
         // Create console layer (always enabled for development)
@@ -152,19 +155,20 @@ impl LogConfig {
                 match std::fs::OpenOptions::new()
                     .create(true)
                     .append(true)
-                    .open(log_file) {
+                    .open(log_file)
+                {
                     Ok(file) => {
                         let file_layer = tracing_subscriber::fmt::layer()
-                            .with_ansi(false)  // No colors in file
+                            .with_ansi(false) // No colors in file
                             .with_target(true)
                             .with_file(true)
                             .with_line_number(true)
                             .compact()
                             .with_writer(file);
-                            
+
                         let subscriber = subscriber.with(file_layer);
                         tracing::subscriber::set_global_default(subscriber)?;
-                        
+
                         info!("🚀 Logging system initialized with console and file output");
                         debug!("Log file: {}", log_file);
                     }
@@ -185,7 +189,7 @@ impl LogConfig {
         }
 
         debug!("Log configuration: {:?}", self);
-        
+
         Ok(())
     }
 
@@ -197,7 +201,7 @@ impl LogConfig {
 fn level_string(level: &LogLevel) -> &'static str {
     match level {
         LogLevel::Trace => "trace",
-        LogLevel::Debug => "debug", 
+        LogLevel::Debug => "debug",
         LogLevel::Info => "info",
         LogLevel::Warn => "warn",
         LogLevel::Error => "error",
@@ -205,6 +209,7 @@ fn level_string(level: &LogLevel) -> &'static str {
 }
 
 /// Initialize logging with default configuration
+#[allow(dead_code)]
 pub fn init_default_logging() -> Result<()> {
     LogConfig::default().init()
 }
@@ -216,11 +221,11 @@ pub fn init_dev_logging() -> Result<()> {
         std::fs::create_dir_all(Config::logs_directory())?;
         println!("📁 Created logs directory: {:?}", Config::logs_directory());
     }
-    
+
     // Generate timestamped log file path
     let log_file = Config::generate_log_file_path();
     println!("📝 Log file will be created at: {:?}", log_file);
-    
+
     // Test file creation to ensure path is writable
     if let Some(parent) = log_file.parent() {
         if !parent.exists() {
@@ -228,7 +233,7 @@ pub fn init_dev_logging() -> Result<()> {
             println!("📁 Created parent directories for log file");
         }
     }
-    
+
     LogConfig::new()
         .with_level(LogLevel::Debug)
         .with_colored(true)
@@ -241,18 +246,18 @@ pub fn init_dev_logging() -> Result<()> {
 }
 
 /// Initialize logging for production (concise, file-based)
+#[allow(dead_code)]
 pub fn init_prod_logging<P: AsRef<Path>>(log_file: P) -> Result<()> {
     LogConfig::new()
         .with_level(LogLevel::Info)
         .with_colored(false)
         .with_location(false)
         .with_file_logging(log_file)
-        .with_component_level("ort", LogLevel::Error)  // Minimize ONNX noise in prod
+        .with_component_level("ort", LogLevel::Error) // Minimize ONNX noise in prod
         .init()
 }
 
-/// Structured logging macros for consistent formatting
-
+// Structured logging macros for consistent formatting
 /// Log file processing operations
 macro_rules! log_file_processing {
     ($level:ident, $action:expr, $file:expr) => {
@@ -274,6 +279,7 @@ macro_rules! log_directory_op {
 }
 
 /// Log configuration operations
+#[allow(unused_macros)]
 macro_rules! log_config_op {
     ($level:ident, $action:expr, $component:expr) => {
         tracing::$level!("🔧 {} {}", $action, $component);
@@ -294,6 +300,7 @@ macro_rules! log_mcp_op {
 }
 
 /// Log performance metrics
+#[allow(unused_macros)]
 macro_rules! log_performance {
     ($level:ident, $operation:expr, $duration:expr) => {
         tracing::$level!("⏱️ {} took: {:?}", $operation, $duration);
@@ -320,11 +327,9 @@ macro_rules! log_status {
 }
 
 // Re-export macros for use in other modules
-pub(crate) use log_file_processing;
 pub(crate) use log_directory_op;
-pub(crate) use log_config_op;
+pub(crate) use log_file_processing;
 pub(crate) use log_mcp_op;
-pub(crate) use log_performance;
 pub(crate) use log_status;
 
 #[cfg(test)]
@@ -337,7 +342,7 @@ mod tests {
             .with_level(LogLevel::Debug)
             .with_colored(false)
             .with_location(true);
-        
+
         assert!(matches!(config.level, LogLevel::Debug));
         assert!(!config.colored);
         assert!(config.include_location);

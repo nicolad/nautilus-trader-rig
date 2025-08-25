@@ -9,7 +9,6 @@ use anyhow::{anyhow, Result};
 use rig::completion::Prompt;
 use rig::providers::deepseek;
 use rig::client::{CompletionClient, ProviderClient};
-use reqwest;
 use serde::{Deserialize, Serialize};
 use std::env;
 use tracing::{info, debug};
@@ -221,24 +220,28 @@ impl DeepSeekClient {
 }
 
 // DeepSeek Embedding Client Structures
+#[allow(dead_code)]
 #[derive(Debug, Serialize)]
 struct DeepSeekEmbeddingRequest {
     model: String,
     input: Vec<String>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 struct DeepSeekEmbeddingResponse {
     data: Vec<EmbeddingData>,
     usage: Usage,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 struct EmbeddingData {
     embedding: Vec<f32>,
     index: usize,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 struct Usage {
     prompt_tokens: u32,
@@ -246,6 +249,7 @@ struct Usage {
 }
 
 /// DeepSeek embedding client for vector embeddings
+#[allow(dead_code)]
 pub struct DeepSeekEmbeddingClient {
     client: reqwest::Client,
     api_key: String,
@@ -253,6 +257,7 @@ pub struct DeepSeekEmbeddingClient {
     model: String,
 }
 
+#[allow(dead_code)]
 impl DeepSeekEmbeddingClient {
     pub fn new() -> Result<Self> {
         let api_key = env::var("DEEPSEEK_API_KEY")
@@ -277,7 +282,7 @@ impl DeepSeekEmbeddingClient {
         debug!("Making DeepSeek embedding request for {} texts", request.input.len());
         
         let response = self.client
-            .post(&format!("{}/embeddings", self.base_url))
+            .post(format!("{}/embeddings", self.base_url))
             .header("Authorization", format!("Bearer {}", self.api_key))
             .header("Content-Type", "application/json")
             .json(&request)
@@ -316,9 +321,8 @@ mod tests {
 
     #[test]
     fn test_deepseek_client_creation() {
-        let client = DeepSeekClient::new("test-api-key".to_string());
-        // Just test that we can create the client without panicking
-        assert!(true);
+    let _client = DeepSeekClient::new("test-api-key".to_string());
+    // Just test that we can create the client without panicking
     }
 
     #[tokio::test]
@@ -344,10 +348,8 @@ mod tests {
 
     #[test]
     fn test_analyze_commits_prompt_format() {
-        let commits = vec![
-            "abc123|John Doe|john@example.com|2025-08-22 10:30:00 +0000|feat: add new feature".to_string(),
-            "def456|Jane Smith|jane@example.com|2025-08-22 11:30:00 +0000|fix: correct typo".to_string(),
-        ];
+        let commits = ["abc123|John Doe|john@example.com|2025-08-22 10:30:00 +0000|feat: add new feature".to_string(),
+            "def456|Jane Smith|jane@example.com|2025-08-22 11:30:00 +0000|fix: correct typo".to_string()];
         
         let prompt = format!(
             "Analyze these git commits for quality, consistency, and potential issues:\n\n{}",
@@ -403,11 +405,10 @@ mod tests {
     fn test_client_clone() {
         std::env::set_var("DEEPSEEK_API_KEY", "test-key");
         
-        let client = DeepSeekClient::from_env().unwrap();
-        let cloned_client = client.clone();
+    let client = DeepSeekClient::from_env().unwrap();
+    let _cloned_client = client.clone();
         
-        // Both clients should be valid (this tests the Clone implementation)
-        assert!(true); // If we get here, clone worked
+    // Both clients should be valid (this tests the Clone implementation)
         
         std::env::remove_var("DEEPSEEK_API_KEY");
     }

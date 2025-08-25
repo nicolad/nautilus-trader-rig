@@ -7,6 +7,7 @@ use std::path::Path;
 /// Application configuration constants
 pub struct Config;
 
+#[allow(dead_code)]
 impl Config {
     /// Path to the environment file (relative to crate dir)
     pub const ENV_FILE_PATH: &'static str = ".env";
@@ -42,6 +43,7 @@ impl Config {
     pub const FASTEMBED_DIMENSION: usize = 384;
 }
 
+#[allow(dead_code)]
 impl Config {
     /// Absolute path to this crate's directory at compile time
     pub fn manifest_dir() -> &'static Path {

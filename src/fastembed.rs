@@ -29,6 +29,7 @@ struct WordDefinition {
     definitions: Vec<String>,
 }
 
+#[allow(dead_code)]
 pub async fn run_fastembed_test() -> Result<()> {
     // Get model info
     let test_model_info =

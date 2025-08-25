@@ -5,7 +5,7 @@
 
 use anyhow::Result;
 use std::path::Path;
-use tracing::{debug, error, info, trace, warn};
+use tracing::{debug, info, trace};
 use serde::{Deserialize, Serialize};
 
 use fastembed::{
