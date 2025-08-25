@@ -1,0 +1,26 @@
+{
+  "adapter_name": "parse",
+  "analysis_context": "Automated detection via Nautilus Trader Rig",
+  "bug_id": "AUTO_BUG_parse_7_182649",
+  "code_sample": "",
+  "description": "The `parse_timestamp` function contains a critical integer overflow vulnerability. When `value_us` is sufficiently large (≥ 2^64 / 1_000_000 = ~1.84e13), the multiplication by `NANOSECONDS_IN_MICROSECOND` (1,000,000) will overflow a u64, causing `checked_mul` to return None. This triggers the `map_or` branch which returns `UnixNanos::max()` instead of the correct timestamp. In financial trading systems, timestamp corruption can lead to incorrect order sequencing, missed trades, incorrect backtesting results, and potential financial losses.",
+  "file_location": {
+    "details": {
+      "absolute_path": "/Users/vadimnicolai/Public/trading/nautilus_trader/nautilus-trader-rig/../crates/adapters/tardis/src/parse.rs",
+      "directory": "/Users/vadimnicolai/Public/trading/nautilus_trader/nautilus-trader-rig/../crates/adapters/tardis/src",
+      "file_size_bytes": 14840,
+      "filename": "parse.rs",
+      "last_modified_timestamp": 1756068214,
+      "relative_path": "../crates/adapters/tardis/src/parse.rs"
+    },
+    "source_location": {}
+  },
+  "fix_suggestion": "Use saturating arithmetic or proper error handling instead of silently returning max value. Consider:",
+  "severity": "CRITICAL",
+  "timestamp": "20250825_182649",
+  "workspace_info": {
+    "branch": "main",
+    "commit_hash": "647630eb9ce73d7235c504cfe96cd6553b6ab21b",
+    "repository": "nautilus_trader"
+  }
+}

@@ -1,0 +1,383 @@
+{
+  "analysis_summary": {
+    "analysis_timestamp": "2025-08-25T18:35:09.850423+00:00",
+    "bugs_found": 17,
+    "files_analyzed": 30,
+    "total_files_discovered": 30,
+    "workspace_info": {
+      "adapters_path": "/Users/vadimnicolai/Public/trading/nautilus_trader/nautilus-trader-rig/../crates/adapters",
+      "branch": "main",
+      "repository": "nautilus_trader"
+    }
+  },
+  "file_results": [
+    {
+      "file_metadata": {
+        "last_modified": 1752439239,
+        "lines_of_code": 14,
+        "size_bytes": 883
+      },
+      "file_path": "/Users/vadimnicolai/Public/trading/nautilus_trader/nautilus-trader-rig/../crates/adapters/okx/src/config.rs",
+      "status": "clean",
+      "timestamp": "2025-08-25T18:20:13.888061+00:00"
+    },
+    {
+      "file_metadata": {
+        "last_modified": 1755919820,
+        "lines_of_code": 58,
+        "size_bytes": 2784
+      },
+      "file_path": "/Users/vadimnicolai/Public/trading/nautilus_trader/nautilus-trader-rig/../crates/adapters/okx/src/lib.rs",
+      "status": "clean",
+      "timestamp": "2025-08-25T18:20:24.195229+00:00"
+    },
+    {
+      "file_metadata": {
+        "last_modified": 1752593628,
+        "lines_of_code": 14,
+        "size_bytes": 883
+      },
+      "file_path": "/Users/vadimnicolai/Public/trading/nautilus_trader/nautilus-trader-rig/../crates/adapters/hyperliquid/src/config.rs",
+      "status": "clean",
+      "timestamp": "2025-08-25T18:20:31.893226+00:00"
+    },
+    {
+      "file_metadata": {
+        "last_modified": 1755919820,
+        "lines_of_code": 55,
+        "size_bytes": 2643
+      },
+      "file_path": "/Users/vadimnicolai/Public/trading/nautilus_trader/nautilus-trader-rig/../crates/adapters/hyperliquid/src/lib.rs",
+      "status": "clean",
+      "timestamp": "2025-08-25T18:20:42.380411+00:00"
+    },
+    {
+      "file_metadata": {
+        "last_modified": 1755603654,
+        "lines_of_code": 14,
+        "size_bytes": 883
+      },
+      "file_path": "/Users/vadimnicolai/Public/trading/nautilus_trader/nautilus-trader-rig/../crates/adapters/bitmex/src/config.rs",
+      "status": "clean",
+      "timestamp": "2025-08-25T18:20:50.320971+00:00"
+    },
+    {
+      "file_metadata": {
+        "last_modified": 1756068214,
+        "lines_of_code": 58,
+        "size_bytes": 2803
+      },
+      "file_path": "/Users/vadimnicolai/Public/trading/nautilus_trader/nautilus-trader-rig/../crates/adapters/bitmex/src/lib.rs",
+      "status": "clean",
+      "timestamp": "2025-08-25T18:21:04.428910+00:00"
+    },
+    {
+      "file_metadata": {
+        "last_modified": 1750320294,
+        "lines_of_code": 14,
+        "size_bytes": 883
+      },
+      "file_path": "/Users/vadimnicolai/Public/trading/nautilus_trader/nautilus-trader-rig/../crates/adapters/coinbase_intx/src/config.rs",
+      "status": "clean",
+      "timestamp": "2025-08-25T18:21:11.343723+00:00"
+    },
+    {
+      "file_metadata": {
+        "last_modified": 1755919820,
+        "lines_of_code": 56,
+        "size_bytes": 2657
+      },
+      "file_path": "/Users/vadimnicolai/Public/trading/nautilus_trader/nautilus-trader-rig/../crates/adapters/coinbase_intx/src/lib.rs",
+      "status": "clean",
+      "timestamp": "2025-08-25T18:21:20.983886+00:00"
+    },
+    {
+      "affected_functions": "BlockchainDataClientFactory::create",
+      "bug_file": "/Users/vadimnicolai/Public/trading/nautilus_trader/nautilus-trader-rig/bugs/AUTO_BUG_factories_1_182158_factories_20250825_182158.json",
+      "bug_id": "AUTO_BUG_factories_1_182158",
+      "file_metadata": {
+        "last_modified": 1755603654,
+        "lines_of_code": 123,
+        "size_bytes": 3973
+      },
+      "file_path": "/Users/vadimnicolai/Public/trading/nautilus_trader/nautilus-trader-rig/../crates/adapters/blockchain/src/factories.rs",
+      "severity": "HIGH",
+      "status": "bug_found",
+      "timestamp": "2025-08-25T18:21:58.659570+00:00"
+    },
+    {
+      "affected_functions": "Unknown",
+      "bug_file": "/Users/vadimnicolai/Public/trading/nautilus_trader/nautilus-trader-rig/bugs/AUTO_BUG_config_2_182233_config_20250825_182233.json",
+      "bug_id": "AUTO_BUG_config_2_182233",
+      "file_metadata": {
+        "last_modified": 1755603654,
+        "lines_of_code": 102,
+        "size_bytes": 3925
+      },
+      "file_path": "/Users/vadimnicolai/Public/trading/nautilus_trader/nautilus-trader-rig/../crates/adapters/blockchain/src/config.rs",
+      "severity": "MEDIUM",
+      "status": "bug_found",
+      "timestamp": "2025-08-25T18:22:34.009559+00:00"
+    },
+    {
+      "file_metadata": {
+        "last_modified": 1755919820,
+        "lines_of_code": 75,
+        "size_bytes": 2898
+      },
+      "file_path": "/Users/vadimnicolai/Public/trading/nautilus_trader/nautilus-trader-rig/../crates/adapters/blockchain/src/lib.rs",
+      "status": "clean",
+      "timestamp": "2025-08-25T18:22:45.178692+00:00"
+    },
+    {
+      "affected_functions": "format_number, BlockchainSyncReporter::log_progress, BlockchainSyncReporter::log_final_stats",
+      "bug_file": "/Users/vadimnicolai/Public/trading/nautilus_trader/nautilus-trader-rig/bugs/AUTO_BUG_reporting_3_182336_reporting_20250825_182336.json",
+      "bug_id": "AUTO_BUG_reporting_3_182336",
+      "file_metadata": {
+        "last_modified": 1755844633,
+        "lines_of_code": 140,
+        "size_bytes": 4961
+      },
+      "file_path": "/Users/vadimnicolai/Public/trading/nautilus_trader/nautilus-trader-rig/../crates/adapters/blockchain/src/reporting.rs",
+      "severity": "CRITICAL",
+      "status": "bug_found",
+      "timestamp": "2025-08-25T18:23:36.413645+00:00"
+    },
+    {
+      "affected_functions": "convert_i256_to_f64, convert_u256_to_f64",
+      "bug_file": "/Users/vadimnicolai/Public/trading/nautilus_trader/nautilus-trader-rig/bugs/AUTO_BUG_math_4_182421_math_20250825_182421.json",
+      "bug_id": "AUTO_BUG_math_4_182421",
+      "file_metadata": {
+        "last_modified": 1756136122,
+        "lines_of_code": 347,
+        "size_bytes": 13073
+      },
+      "file_path": "/Users/vadimnicolai/Public/trading/nautilus_trader/nautilus-trader-rig/../crates/adapters/blockchain/src/math.rs",
+      "severity": "CRITICAL",
+      "status": "bug_found",
+      "timestamp": "2025-08-25T18:24:21.656368+00:00"
+    },
+    {
+      "affected_functions": "u256_to_quantity, u256_to_price",
+      "bug_file": "/Users/vadimnicolai/Public/trading/nautilus_trader/nautilus-trader-rig/bugs/AUTO_BUG_decode_5_182454_decode_20250825_182454.json",
+      "bug_id": "AUTO_BUG_decode_5_182454",
+      "file_metadata": {
+        "last_modified": 1755603654,
+        "lines_of_code": 109,
+        "size_bytes": 4332
+      },
+      "file_path": "/Users/vadimnicolai/Public/trading/nautilus_trader/nautilus-trader-rig/../crates/adapters/blockchain/src/decode.rs",
+      "severity": "CRITICAL",
+      "status": "bug_found",
+      "timestamp": "2025-08-25T18:24:54.075534+00:00"
+    },
+    {
+      "file_metadata": {
+        "last_modified": 1750320294,
+        "lines_of_code": 31,
+        "size_bytes": 1548
+      },
+      "file_path": "/Users/vadimnicolai/Public/trading/nautilus_trader/nautilus-trader-rig/../crates/adapters/tardis/src/config.rs",
+      "status": "clean",
+      "timestamp": "2025-08-25T18:25:06.511251+00:00"
+    },
+    {
+      "file_metadata": {
+        "last_modified": 1755919820,
+        "lines_of_code": 63,
+        "size_bytes": 2694
+      },
+      "file_path": "/Users/vadimnicolai/Public/trading/nautilus_trader/nautilus-trader-rig/../crates/adapters/tardis/src/lib.rs",
+      "status": "clean",
+      "timestamp": "2025-08-25T18:25:15.988432+00:00"
+    },
+    {
+      "affected_functions": "TardisExchange::from_venue_str, TardisExchange::as_venue_str",
+      "bug_file": "/Users/vadimnicolai/Public/trading/nautilus_trader/nautilus-trader-rig/bugs/AUTO_BUG_enums_6_182555_enums_20250825_182555.json",
+      "bug_id": "AUTO_BUG_enums_6_182555",
+      "file_metadata": {
+        "last_modified": 1756068214,
+        "lines_of_code": 395,
+        "size_bytes": 10819
+      },
+      "file_path": "/Users/vadimnicolai/Public/trading/nautilus_trader/nautilus-trader-rig/../crates/adapters/tardis/src/enums.rs",
+      "severity": "MEDIUM",
+      "status": "bug_found",
+      "timestamp": "2025-08-25T18:25:55.897722+00:00"
+    },
+    {
+      "affected_functions": "parse_timestamp",
+      "bug_file": "/Users/vadimnicolai/Public/trading/nautilus_trader/nautilus-trader-rig/bugs/AUTO_BUG_parse_7_182649_parse_20250825_182649.json",
+      "bug_id": "AUTO_BUG_parse_7_182649",
+      "file_metadata": {
+        "last_modified": 1756068214,
+        "lines_of_code": 447,
+        "size_bytes": 14840
+      },
+      "file_path": "/Users/vadimnicolai/Public/trading/nautilus_trader/nautilus-trader-rig/../crates/adapters/tardis/src/parse.rs",
+      "severity": "CRITICAL",
+      "status": "bug_found",
+      "timestamp": "2025-08-25T18:26:49.693954+00:00"
+    },
+    {
+      "affected_functions": "Unknown",
+      "bug_file": "/Users/vadimnicolai/Public/trading/nautilus_trader/nautilus-trader-rig/bugs/AUTO_BUG_replay_8_182728_replay_20250825_182728.json",
+      "bug_id": "AUTO_BUG_replay_8_182728",
+      "file_metadata": {
+        "last_modified": 1756068214,
+        "lines_of_code": 535,
+        "size_bytes": 19014
+      },
+      "file_path": "/Users/vadimnicolai/Public/trading/nautilus_trader/nautilus-trader-rig/../crates/adapters/tardis/src/replay.rs",
+      "severity": "CRITICAL",
+      "status": "bug_found",
+      "timestamp": "2025-08-25T18:27:28.642129+00:00"
+    },
+    {
+      "affected_functions": "get_range_quotes, get_range_trades, get_range_bars, get_range_instruments, get_range_imbalance, get_range_statistics, get_range_status",
+      "bug_file": "/Users/vadimnicolai/Public/trading/nautilus_trader/nautilus-trader-rig/bugs/AUTO_BUG_historical_9_182835_historical_20250825_182835.json",
+      "bug_id": "AUTO_BUG_historical_9_182835",
+      "file_metadata": {
+        "last_modified": 1751526423,
+        "lines_of_code": 683,
+        "size_bytes": 24546
+      },
+      "file_path": "/Users/vadimnicolai/Public/trading/nautilus_trader/nautilus-trader-rig/../crates/adapters/databento/src/historical.rs",
+      "severity": "CRITICAL",
+      "status": "bug_found",
+      "timestamp": "2025-08-25T18:28:35.328804+00:00"
+    },
+    {
+      "affected_functions": "DatabentoImbalance::new, all code that uses the `significant_imbalance` field",
+      "bug_file": "/Users/vadimnicolai/Public/trading/nautilus_trader/nautilus-trader-rig/bugs/AUTO_BUG_types_10_182927_types_20250825_182927.json",
+      "bug_id": "AUTO_BUG_types_10_182927",
+      "file_metadata": {
+        "last_modified": 1755849306,
+        "lines_of_code": 193,
+        "size_bytes": 6905
+      },
+      "file_path": "/Users/vadimnicolai/Public/trading/nautilus_trader/nautilus-trader-rig/../crates/adapters/databento/src/types.rs",
+      "severity": "CRITICAL",
+      "status": "bug_found",
+      "timestamp": "2025-08-25T18:29:28.027532+00:00"
+    },
+    {
+      "affected_functions": "Unknown",
+      "bug_file": "/Users/vadimnicolai/Public/trading/nautilus_trader/nautilus-trader-rig/bugs/AUTO_BUG_factories_11_183009_factories_20250825_183009.json",
+      "bug_id": "AUTO_BUG_factories_11_183009",
+      "file_metadata": {
+        "last_modified": 1750320294,
+        "lines_of_code": 326,
+        "size_bytes": 10431
+      },
+      "file_path": "/Users/vadimnicolai/Public/trading/nautilus_trader/nautilus-trader-rig/../crates/adapters/databento/src/factories.rs",
+      "severity": "HIGH",
+      "status": "bug_found",
+      "timestamp": "2025-08-25T18:30:09.164407+00:00"
+    },
+    {
+      "affected_functions": "instrument_id_to_symbol_string, decode_nautilus_instrument_id",
+      "bug_file": "/Users/vadimnicolai/Public/trading/nautilus_trader/nautilus-trader-rig/bugs/AUTO_BUG_symbology_12_183052_symbology_20250825_183052.json",
+      "bug_id": "AUTO_BUG_symbology_12_183052",
+      "file_metadata": {
+        "last_modified": 1755849306,
+        "lines_of_code": 270,
+        "size_bytes": 9697
+      },
+      "file_path": "/Users/vadimnicolai/Public/trading/nautilus_trader/nautilus-trader-rig/../crates/adapters/databento/src/symbology.rs",
+      "severity": "HIGH",
+      "status": "bug_found",
+      "timestamp": "2025-08-25T18:30:52.293441+00:00"
+    },
+    {
+      "file_metadata": {
+        "last_modified": 1755919820,
+        "lines_of_code": 67,
+        "size_bytes": 2913
+      },
+      "file_path": "/Users/vadimnicolai/Public/trading/nautilus_trader/nautilus-trader-rig/../crates/adapters/databento/src/lib.rs",
+      "status": "clean",
+      "timestamp": "2025-08-25T18:31:01.753884+00:00"
+    },
+    {
+      "file_metadata": {
+        "last_modified": 1750320294,
+        "lines_of_code": 123,
+        "size_bytes": 3498
+      },
+      "file_path": "/Users/vadimnicolai/Public/trading/nautilus_trader/nautilus-trader-rig/../crates/adapters/databento/src/enums.rs",
+      "status": "clean",
+      "timestamp": "2025-08-25T18:31:13.481812+00:00"
+    },
+    {
+      "affected_functions": "Unknown",
+      "bug_file": "/Users/vadimnicolai/Public/trading/nautilus_trader/nautilus-trader-rig/bugs/AUTO_BUG_data_13_183151_data_20250825_183151.json",
+      "bug_id": "AUTO_BUG_data_13_183151",
+      "file_metadata": {
+        "last_modified": 1755849306,
+        "lines_of_code": 827,
+        "size_bytes": 29652
+      },
+      "file_path": "/Users/vadimnicolai/Public/trading/nautilus_trader/nautilus-trader-rig/../crates/adapters/databento/src/data.rs",
+      "severity": "HIGH",
+      "status": "bug_found",
+      "timestamp": "2025-08-25T18:31:51.135295+00:00"
+    },
+    {
+      "affected_functions": "decode_multiplier, decode_futures_contract, decode_futures_spread, decode_option_contract, decode_option_spread",
+      "bug_file": "/Users/vadimnicolai/Public/trading/nautilus_trader/nautilus-trader-rig/bugs/AUTO_BUG_decode_14_183315_decode_20250825_183315.json",
+      "bug_id": "AUTO_BUG_decode_14_183315",
+      "file_metadata": {
+        "last_modified": 1755850661,
+        "lines_of_code": 1887,
+        "size_bytes": 66041
+      },
+      "file_path": "/Users/vadimnicolai/Public/trading/nautilus_trader/nautilus-trader-rig/../crates/adapters/databento/src/decode.rs",
+      "severity": "CRITICAL",
+      "status": "bug_found",
+      "timestamp": "2025-08-25T18:33:15.733697+00:00"
+    },
+    {
+      "affected_functions": "",
+      "bug_file": "/Users/vadimnicolai/Public/trading/nautilus_trader/nautilus-trader-rig/bugs/AUTO_BUG_loader_15_183401_loader_20250825_183401.json",
+      "bug_id": "AUTO_BUG_loader_15_183401",
+      "file_metadata": {
+        "last_modified": 1755603654,
+        "lines_of_code": 933,
+        "size_bytes": 33934
+      },
+      "file_path": "/Users/vadimnicolai/Public/trading/nautilus_trader/nautilus-trader-rig/../crates/adapters/databento/src/loader.rs",
+      "severity": "CRITICAL",
+      "status": "bug_found",
+      "timestamp": "2025-08-25T18:34:01.630016+00:00"
+    },
+    {
+      "affected_functions": "",
+      "bug_file": "/Users/vadimnicolai/Public/trading/nautilus_trader/nautilus-trader-rig/bugs/AUTO_BUG_live_16_183439_live_20250825_183439.json",
+      "bug_id": "AUTO_BUG_live_16_183439",
+      "file_metadata": {
+        "last_modified": 1755849306,
+        "lines_of_code": 672,
+        "size_bytes": 24896
+      },
+      "file_path": "/Users/vadimnicolai/Public/trading/nautilus_trader/nautilus-trader-rig/../crates/adapters/databento/src/live.rs",
+      "severity": "CRITICAL",
+      "status": "bug_found",
+      "timestamp": "2025-08-25T18:34:39.360011+00:00"
+    },
+    {
+      "affected_functions": "get_date_time_range",
+      "bug_file": "/Users/vadimnicolai/Public/trading/nautilus_trader/nautilus-trader-rig/bugs/AUTO_BUG_common_17_183509_common_20250825_183509.json",
+      "bug_id": "AUTO_BUG_common_17_183509",
+      "file_metadata": {
+        "last_modified": 1750320294,
+        "lines_of_code": 59,
+        "size_bytes": 2369
+      },
+      "file_path": "/Users/vadimnicolai/Public/trading/nautilus_trader/nautilus-trader-rig/../crates/adapters/databento/src/common.rs",
+      "severity": "CRITICAL",
+      "status": "bug_found",
+      "timestamp": "2025-08-25T18:35:09.348201+00:00"
+    }
+  ]
+}

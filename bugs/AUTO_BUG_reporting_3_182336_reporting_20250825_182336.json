@@ -1,0 +1,26 @@
+{
+  "adapter_name": "reporting",
+  "analysis_context": "Automated detection via Nautilus Trader Rig",
+  "bug_id": "AUTO_BUG_reporting_3_182336",
+  "code_sample": "",
+  "description": "The `format_number` function has a critical integer overflow vulnerability. When converting from f64 to u64, if the input value is negative, the rounding operation will produce a large positive number due to two's complement representation. For financial applications, this could lead to completely incorrect reporting of block numbers, rates, and progress percentages. A negative input (which shouldn't occur in this context but could result from calculation errors) would be interpreted as an extremely large positive number.",
+  "file_location": {
+    "details": {
+      "absolute_path": "/Users/vadimnicolai/Public/trading/nautilus_trader/nautilus-trader-rig/../crates/adapters/blockchain/src/reporting.rs",
+      "directory": "/Users/vadimnicolai/Public/trading/nautilus_trader/nautilus-trader-rig/../crates/adapters/blockchain/src",
+      "file_size_bytes": 4961,
+      "filename": "reporting.rs",
+      "last_modified_timestamp": 1755844633,
+      "relative_path": "../crates/adapters/blockchain/src/reporting.rs"
+    },
+    "source_location": {}
+  },
+  "fix_suggestion": "Add input validation to ensure the value is non-negative before conversion, or use signed integers and handle negative values appropriately:",
+  "severity": "CRITICAL",
+  "timestamp": "20250825_182336",
+  "workspace_info": {
+    "branch": "main",
+    "commit_hash": "647630eb9ce73d7235c504cfe96cd6553b6ab21b",
+    "repository": "nautilus_trader"
+  }
+}

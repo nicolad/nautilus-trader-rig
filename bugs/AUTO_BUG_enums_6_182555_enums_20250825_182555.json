@@ -1,0 +1,26 @@
+{
+  "adapter_name": "enums",
+  "analysis_context": "Automated detection via Nautilus Trader Rig",
+  "bug_id": "AUTO_BUG_enums_6_182555",
+  "code_sample": "",
+  "description": "The `from_venue_str` function has incomplete mapping logic that could lead to incorrect exchange identification. Several exchange variants are missing from the mapping table, including `BinanceUs`, `HuobiDmSwap`, and others. This could cause financial trading systems to misidentify exchanges, potentially leading to incorrect market data processing or order routing.",
+  "file_location": {
+    "details": {
+      "absolute_path": "/Users/vadimnicolai/Public/trading/nautilus_trader/nautilus-trader-rig/../crates/adapters/tardis/src/enums.rs",
+      "directory": "/Users/vadimnicolai/Public/trading/nautilus_trader/nautilus-trader-rig/../crates/adapters/tardis/src",
+      "file_size_bytes": 10819,
+      "filename": "enums.rs",
+      "last_modified_timestamp": 1756068214,
+      "relative_path": "../crates/adapters/tardis/src/enums.rs"
+    },
+    "source_location": {}
+  },
+  "fix_suggestion": "Complete the mapping table to include all exchange variants. Consider using a more maintainable approach such as a static HashMap or implementing a derive-based solution to ensure all enum variants are properly mapped. Add comprehensive tests to verify all exchange variants can be correctly mapped from venue strings.",
+  "severity": "MEDIUM",
+  "timestamp": "20250825_182555",
+  "workspace_info": {
+    "branch": "main",
+    "commit_hash": "647630eb9ce73d7235c504cfe96cd6553b6ab21b",
+    "repository": "nautilus_trader"
+  }
+}

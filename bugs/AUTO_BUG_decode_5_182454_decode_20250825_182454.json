@@ -1,0 +1,26 @@
+{
+  "adapter_name": "decode",
+  "analysis_context": "Automated detection via Nautilus Trader Rig",
+  "bug_id": "AUTO_BUG_decode_5_182454",
+  "code_sample": "",
+  "description": "The code uses floating-point (f64) conversion for financial calculations when decimals != 18, which can lead to precision loss and financial calculation errors. Floating-point arithmetic is inherently imprecise and can result in rounding errors, which is unacceptable for financial applications where exact decimal arithmetic is required. The `convert_u256_to_f64` function likely performs division by 10^decimals, which can lose precision for large U256 values that exceed f64's 53-bit mantissa precision.",
+  "file_location": {
+    "details": {
+      "absolute_path": "/Users/vadimnicolai/Public/trading/nautilus_trader/nautilus-trader-rig/../crates/adapters/blockchain/src/decode.rs",
+      "directory": "/Users/vadimnicolai/Public/trading/nautilus_trader/nautilus-trader-rig/../crates/adapters/blockchain/src",
+      "file_size_bytes": 4332,
+      "filename": "decode.rs",
+      "last_modified_timestamp": 1755603654,
+      "relative_path": "../crates/adapters/blockchain/src/decode.rs"
+    },
+    "source_location": {}
+  },
+  "fix_suggestion": "Replace the floating-point conversion with a proper decimal arithmetic implementation. Use a decimal arithmetic library (such as `rust_decimal`) or implement fixed-point arithmetic using integers. For example, instead of converting to f64, maintain the value as an integer and track the decimal precision separately, or use a decimal type that preserves exact precision.",
+  "severity": "CRITICAL",
+  "timestamp": "20250825_182454",
+  "workspace_info": {
+    "branch": "main",
+    "commit_hash": "647630eb9ce73d7235c504cfe96cd6553b6ab21b",
+    "repository": "nautilus_trader"
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "adapter_name": "replay",
+  "analysis_context": "Automated detection via Nautilus Trader Rig",
+  "bug_id": "AUTO_BUG_replay_8_182728",
+  "code_sample": "See file content",
+  "description": "The code contains multiple potential panics that could cause the entire replay process to crash unexpectedly. These include:",
+  "file_location": {
+    "details": {
+      "absolute_path": "/Users/vadimnicolai/Public/trading/nautilus_trader/nautilus-trader-rig/../crates/adapters/tardis/src/replay.rs",
+      "directory": "/Users/vadimnicolai/Public/trading/nautilus_trader/nautilus-trader-rig/../crates/adapters/tardis/src",
+      "file_size_bytes": 19014,
+      "filename": "replay.rs",
+      "last_modified_timestamp": 1756068214,
+      "relative_path": "../crates/adapters/tardis/src/replay.rs"
+    },
+    "source_location": {}
+  },
+  "fix_suggestion": "Use more conservative initial capacities or implement dynamic growth strategies.",
+  "severity": "CRITICAL",
+  "timestamp": "20250825_182728",
+  "workspace_info": {
+    "branch": "main",
+    "commit_hash": "647630eb9ce73d7235c504cfe96cd6553b6ab21b",
+    "repository": "nautilus_trader"
+  }
+}

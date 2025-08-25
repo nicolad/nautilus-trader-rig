@@ -1,0 +1,26 @@
+{
+  "adapter_name": "loader",
+  "analysis_context": "Automated detection via Nautilus Trader Rig",
+  "bug_id": "AUTO_BUG_loader_15_183401",
+  "code_sample": "",
+  "description": "The code contains a critical memory safety issue where the `read_definition_records` method creates an iterator that holds a mutable reference to `self` while also potentially advancing the `dbn_stream` which is part of the iterator state. This creates a self-referential struct that violates Rust's ownership rules and can lead to use-after-free bugs, memory corruption, or undefined behavior. The iterator captures `self` (via `&mut self`) and the `dbn_stream` in the same closure, creating a structure that cannot be safely moved.",
+  "file_location": {
+    "details": {
+      "absolute_path": "/Users/vadimnicolai/Public/trading/nautilus_trader/nautilus-trader-rig/../crates/adapters/databento/src/loader.rs",
+      "directory": "/Users/vadimnicolai/Public/trading/nautilus_trader/nautilus-trader-rig/../crates/adapters/databento/src",
+      "file_size_bytes": 33934,
+      "filename": "loader.rs",
+      "last_modified_timestamp": 1755603654,
+      "relative_path": "../crates/adapters/databento/src/loader.rs"
+    },
+    "source_location": {}
+  },
+  "fix_suggestion": "Restructure the code to avoid self-referential iterators. Options include:",
+  "severity": "CRITICAL",
+  "timestamp": "20250825_183401",
+  "workspace_info": {
+    "branch": "main",
+    "commit_hash": "647630eb9ce73d7235c504cfe96cd6553b6ab21b",
+    "repository": "nautilus_trader"
+  }
+}

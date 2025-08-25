@@ -1,0 +1,26 @@
+{
+  "adapter_name": "factories",
+  "analysis_context": "Automated detection via Nautilus Trader Rig",
+  "bug_id": "AUTO_BUG_factories_11_183009",
+  "code_sample": "",
+  "description": "The code exposes API keys in plain text in multiple locations without proper security handling. API keys are stored as String types and passed around without protection, making them vulnerable to memory inspection attacks. Additionally, the keys may be logged or exposed in error messages through the anyhow crate's error handling. In a trading system, API key compromise could lead to unauthorized data access, financial fraud, or account takeover.",
+  "file_location": {
+    "details": {
+      "absolute_path": "/Users/vadimnicolai/Public/trading/nautilus_trader/nautilus-trader-rig/../crates/adapters/databento/src/factories.rs",
+      "directory": "/Users/vadimnicolai/Public/trading/nautilus_trader/nautilus-trader-rig/../crates/adapters/databento/src",
+      "file_size_bytes": 10431,
+      "filename": "factories.rs",
+      "last_modified_timestamp": 1750320294,
+      "relative_path": "../crates/adapters/databento/src/factories.rs"
+    },
+    "source_location": {}
+  },
+  "fix_suggestion": "",
+  "severity": "HIGH",
+  "timestamp": "20250825_183009",
+  "workspace_info": {
+    "branch": "main",
+    "commit_hash": "647630eb9ce73d7235c504cfe96cd6553b6ab21b",
+    "repository": "nautilus_trader"
+  }
+}

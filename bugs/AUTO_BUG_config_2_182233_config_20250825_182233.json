@@ -1,0 +1,26 @@
+{
+  "adapter_name": "config",
+  "analysis_context": "Automated detection via Nautilus Trader Rig",
+  "bug_id": "AUTO_BUG_config_2_182233",
+  "code_sample": "See file content",
+  "description": "The code contains several potential issues including improper validation of input URLs, potential for denial of service through unlimited vector sizes, and lack of validation for critical financial parameters. The `http_rpc_url` and `wss_rpc_url` parameters are accepted as strings without validation, which could lead to injection attacks if these URLs are used to construct requests. The `dex_ids` vector has no size limits, which could lead to resource exhaustion. The `from_block` parameter lacks validation to ensure it represents a valid block number. Additionally, the use of `Option<u32>` for `rpc_requests_per_second` without a sensible default or validation could lead to performance issues or unintended rate limiting behavior.",
+  "file_location": {
+    "details": {
+      "absolute_path": "/Users/vadimnicolai/Public/trading/nautilus_trader/nautilus-trader-rig/../crates/adapters/blockchain/src/config.rs",
+      "directory": "/Users/vadimnicolai/Public/trading/nautilus_trader/nautilus-trader-rig/../crates/adapters/blockchain/src",
+      "file_size_bytes": 3925,
+      "filename": "config.rs",
+      "last_modified_timestamp": 1755603654,
+      "relative_path": "../crates/adapters/blockchain/src/config.rs"
+    },
+    "source_location": {}
+  },
+  "fix_suggestion": "Manual review required",
+  "severity": "MEDIUM",
+  "timestamp": "20250825_182233",
+  "workspace_info": {
+    "branch": "main",
+    "commit_hash": "647630eb9ce73d7235c504cfe96cd6553b6ab21b",
+    "repository": "nautilus_trader"
+  }
+}
