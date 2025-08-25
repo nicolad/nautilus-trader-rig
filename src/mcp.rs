@@ -77,6 +77,18 @@ pub struct BugStoreRequest {
 }
 
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
+pub struct BugListRequest {
+    pub severity_filter: Option<String>,
+    pub adapter_filter: Option<String>,
+    pub include_file_details: Option<bool>,
+}
+
+#[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
+pub struct BugDetailRequest {
+    pub bug_id: String,
+}
+
+#[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
 pub struct FileReadRequest {
     pub file_path: String,
 }
@@ -265,7 +277,9 @@ impl NautilusMcpServer {
              - write_file: Write content to file\n\
              - list_directory: List directory contents\n\
              - read_adapter: Read adapter source files\n\
-             - store_bug: Store bug analysis to JSON file",
+             - store_bug: Store bug analysis to JSON file\n\
+             - list_bugs: List all stored bugs with file locations and metadata\n\
+             - get_bug_details: Get detailed information about a specific bug",
             vector_store_status, deepseek_status
         );
         
@@ -486,7 +500,356 @@ impl NautilusMcpServer {
         )]))
     }
 
-    #[tool(description = "Store bug analysis as JSON file in bugs directory")]
+    #[tool(description = "List all stored bugs with exact file locations and detailed metadata")]
+    async fn list_bugs(
+        &self,
+        Parameters(BugListRequest { 
+            severity_filter, 
+            adapter_filter, 
+            include_file_details 
+        }): Parameters<BugListRequest>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let bugs_dir = std::path::Path::new(Config::BUGS_DIRECTORY);
+        let include_details = include_file_details.unwrap_or(true);
+        
+        if !bugs_dir.exists() {
+            return Ok(CallToolResult::success(vec![Content::text(
+                "📁 No bugs directory found. No bugs have been stored yet.".to_string()
+            )]));
+        }
+        
+        let mut bug_files = Vec::new();
+        let mut summary_files = Vec::new();
+        
+        // Read all JSON files in bugs directory
+        if let Ok(entries) = async_fs::read_dir(bugs_dir).await {
+            let mut entries = entries;
+            while let Ok(Some(entry)) = entries.next_entry().await {
+                let path = entry.path();
+                if let Some(extension) = path.extension() {
+                    if extension == "json" {
+                        let filename = path.file_name().unwrap_or_default().to_string_lossy();
+                        if filename.starts_with("analysis_summary_") {
+                            summary_files.push(path);
+                        } else if filename.starts_with("AUTO_BUG_") || filename.contains("_BUG_") {
+                            bug_files.push(path);
+                        }
+                    }
+                }
+            }
+        }
+        
+        if bug_files.is_empty() && summary_files.is_empty() {
+            return Ok(CallToolResult::success(vec![Content::text(
+                "📭 No bug reports found in the bugs directory.".to_string()
+            )]));
+        }
+        
+        let mut response_parts = Vec::new();
+        let mut matching_bugs = Vec::new();
+        
+        // Process individual bug files
+        for bug_file in &bug_files {
+            if let Ok(content) = async_fs::read_to_string(bug_file).await {
+                if let Ok(bug_data) = serde_json::from_str::<serde_json::Value>(&content) {
+                    // Apply filters
+                    let mut include_bug = true;
+                    
+                    if let Some(ref sev_filter) = severity_filter {
+                        if let Some(severity) = bug_data.get("severity").and_then(|s| s.as_str()) {
+                            if !severity.to_lowercase().contains(&sev_filter.to_lowercase()) {
+                                include_bug = false;
+                            }
+                        }
+                    }
+                    
+                    if let Some(ref adapter_filter) = adapter_filter {
+                        if let Some(adapter) = bug_data.get("adapter_name").and_then(|a| a.as_str()) {
+                            if !adapter.to_lowercase().contains(&adapter_filter.to_lowercase()) {
+                                include_bug = false;
+                            }
+                        }
+                    }
+                    
+                    if include_bug {
+                        matching_bugs.push((bug_file.clone(), bug_data));
+                    }
+                }
+            }
+        }
+        
+        if matching_bugs.is_empty() {
+            response_parts.push("🔍 No bugs match the specified filters.".to_string());
+        } else {
+            response_parts.push(format!("🐛 Found {} matching bugs:\n", matching_bugs.len()));
+            
+            for (i, (bug_file, bug_data)) in matching_bugs.iter().enumerate() {
+                let bug_id = bug_data.get("bug_id").and_then(|s| s.as_str()).unwrap_or("unknown");
+                let severity = bug_data.get("severity").and_then(|s| s.as_str()).unwrap_or("unknown");
+                let description = bug_data.get("description").and_then(|s| s.as_str()).unwrap_or("No description");
+                let adapter = bug_data.get("adapter_name").and_then(|s| s.as_str()).unwrap_or("unknown");
+                let timestamp = bug_data.get("timestamp").and_then(|s| s.as_str()).unwrap_or("unknown");
+                
+                response_parts.push(format!(
+                    "\n{}. 🆔 Bug ID: {}\n   ⚠️ Severity: {}\n   📦 Adapter: {}\n   ⏰ Timestamp: {}\n   📄 File: {}",
+                    i + 1, bug_id, severity, adapter, timestamp, bug_file.display()
+                ));
+                
+                if include_details {
+                    // Include file location details if available
+                    if let Some(file_location) = bug_data.get("file_location") {
+                        response_parts.push("   📍 File Location Details:".to_string());
+                        
+                        if let Some(details) = file_location.get("details") {
+                            if let Some(abs_path) = details.get("absolute_path").and_then(|s| s.as_str()) {
+                                response_parts.push(format!("      📂 Absolute Path: {}", abs_path));
+                            }
+                            if let Some(rel_path) = details.get("relative_path").and_then(|s| s.as_str()) {
+                                response_parts.push(format!("      📁 Relative Path: {}", rel_path));
+                            }
+                            if let Some(filename) = details.get("filename").and_then(|s| s.as_str()) {
+                                response_parts.push(format!("      📄 Filename: {}", filename));
+                            }
+                            if let Some(size) = details.get("file_size_bytes").and_then(|s| s.as_u64()) {
+                                response_parts.push(format!("      📏 File Size: {} bytes", size));
+                            }
+                        }
+                        
+                        if let Some(source_loc) = file_location.get("source_location") {
+                            if let Some(line_num) = source_loc.get("approximate_line_number").and_then(|s| s.as_u64()) {
+                                response_parts.push(format!("      📍 Approximate Line: {}", line_num));
+                            }
+                        }
+                    }
+                    
+                    // Include workspace info if available
+                    if let Some(workspace) = bug_data.get("workspace_info") {
+                        if let Some(branch) = workspace.get("branch").and_then(|s| s.as_str()) {
+                            response_parts.push(format!("      🌿 Git Branch: {}", branch));
+                        }
+                        if let Some(commit) = workspace.get("commit_hash").and_then(|s| s.as_str()) {
+                            response_parts.push(format!("      🔗 Commit: {}", &commit[..8]));
+                        }
+                    }
+                }
+                
+                response_parts.push(format!("   📝 Description: {}", 
+                    if description.len() > 100 { 
+                        format!("{}...", &description[..100]) 
+                    } else { 
+                        description.to_string() 
+                    }
+                ));
+            }
+        }
+        
+        // Add summary information about analysis runs
+        if !summary_files.is_empty() {
+            response_parts.push(format!("\n📊 Analysis Summary Files: {} found", summary_files.len()));
+            
+            // Show the most recent summary
+            if let Some(latest_summary) = summary_files.last() {
+                if let Ok(content) = async_fs::read_to_string(latest_summary).await {
+                    if let Ok(summary_data) = serde_json::from_str::<serde_json::Value>(&content) {
+                        if let Some(summary) = summary_data.get("analysis_summary") {
+                            response_parts.push("\n📋 Latest Analysis Summary:".to_string());
+                            if let Some(total) = summary.get("total_files_discovered").and_then(|s| s.as_u64()) {
+                                response_parts.push(format!("   📁 Total Files Discovered: {}", total));
+                            }
+                            if let Some(analyzed) = summary.get("files_analyzed").and_then(|s| s.as_u64()) {
+                                response_parts.push(format!("   🔍 Files Analyzed: {}", analyzed));
+                            }
+                            if let Some(bugs) = summary.get("bugs_found").and_then(|s| s.as_u64()) {
+                                response_parts.push(format!("   🐛 Bugs Found: {}", bugs));
+                            }
+                            if let Some(timestamp) = summary.get("analysis_timestamp").and_then(|s| s.as_str()) {
+                                response_parts.push(format!("   ⏰ Analysis Time: {}", timestamp));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        Ok(CallToolResult::success(vec![Content::text(response_parts.join("\n"))]))
+    }
+
+    #[tool(description = "Get detailed information about a specific bug including exact file location and fix suggestions")]
+    async fn get_bug_details(
+        &self,
+        Parameters(BugDetailRequest { bug_id }): Parameters<BugDetailRequest>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let bugs_dir = std::path::Path::new(Config::BUGS_DIRECTORY);
+        
+        if !bugs_dir.exists() {
+            return Ok(CallToolResult::success(vec![Content::text(
+                "📁 No bugs directory found.".to_string()
+            )]));
+        }
+        
+        // Search for bug file by ID
+        let mut found_bug_file = None;
+        if let Ok(entries) = async_fs::read_dir(bugs_dir).await {
+            let mut entries = entries;
+            while let Ok(Some(entry)) = entries.next_entry().await {
+                let path = entry.path();
+                if let Some(extension) = path.extension() {
+                    if extension == "json" {
+                        let filename = path.file_name().unwrap_or_default().to_string_lossy();
+                        if filename.contains(&bug_id) {
+                            found_bug_file = Some(path);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        
+        let Some(bug_file) = found_bug_file else {
+            return Ok(CallToolResult::success(vec![Content::text(
+                format!("❌ Bug with ID '{}' not found.", bug_id)
+            )]));
+        };
+        
+        let content = match async_fs::read_to_string(&bug_file).await {
+            Ok(content) => content,
+            Err(e) => {
+                return Ok(CallToolResult::success(vec![Content::text(
+                    format!("❌ Failed to read bug file: {}", e)
+                )]));
+            }
+        };
+        
+        let bug_data: serde_json::Value = match serde_json::from_str(&content) {
+            Ok(data) => data,
+            Err(e) => {
+                return Ok(CallToolResult::success(vec![Content::text(
+                    format!("❌ Failed to parse bug file: {}", e)
+                )]));
+            }
+        };
+        
+        let mut response_parts = Vec::new();
+        
+        // Basic bug information
+        response_parts.push(format!("🐛 Bug Details for ID: {}", bug_id));
+        response_parts.push("=" .repeat(50));
+        
+        if let Some(severity) = bug_data.get("severity").and_then(|s| s.as_str()) {
+            response_parts.push(format!("⚠️  Severity: {}", severity));
+        }
+        
+        if let Some(adapter) = bug_data.get("adapter_name").and_then(|s| s.as_str()) {
+            response_parts.push(format!("📦 Adapter: {}", adapter));
+        }
+        
+        if let Some(timestamp) = bug_data.get("timestamp").and_then(|s| s.as_str()) {
+            response_parts.push(format!("⏰ Timestamp: {}", timestamp));
+        }
+        
+        if let Some(context) = bug_data.get("analysis_context").and_then(|s| s.as_str()) {
+            response_parts.push(format!("🔍 Analysis Context: {}", context));
+        }
+        
+        response_parts.push("".to_string());
+        
+        // Description
+        if let Some(description) = bug_data.get("description").and_then(|s| s.as_str()) {
+            response_parts.push("📝 Description:".to_string());
+            response_parts.push(format!("   {}", description));
+            response_parts.push("".to_string());
+        }
+        
+        // File location details
+        if let Some(file_location) = bug_data.get("file_location") {
+            response_parts.push("📍 File Location:".to_string());
+            
+            if let Some(details) = file_location.get("details") {
+                if let Some(abs_path) = details.get("absolute_path").and_then(|s| s.as_str()) {
+                    response_parts.push(format!("   📂 Absolute Path: {}", abs_path));
+                }
+                if let Some(rel_path) = details.get("relative_path").and_then(|s| s.as_str()) {
+                    response_parts.push(format!("   📁 Relative Path: {}", rel_path));
+                }
+                if let Some(filename) = details.get("filename").and_then(|s| s.as_str()) {
+                    response_parts.push(format!("   📄 Filename: {}", filename));
+                }
+                if let Some(directory) = details.get("directory").and_then(|s| s.as_str()) {
+                    response_parts.push(format!("   📂 Directory: {}", directory));
+                }
+                if let Some(size) = details.get("file_size_bytes").and_then(|s| s.as_u64()) {
+                    response_parts.push(format!("   📏 File Size: {} bytes", size));
+                }
+                if let Some(modified) = details.get("last_modified_timestamp").and_then(|s| s.as_u64()) {
+                    response_parts.push(format!("   🕒 Last Modified: {} (Unix timestamp)", modified));
+                }
+            }
+            
+            if let Some(source_loc) = file_location.get("source_location") {
+                if let Some(line_num) = source_loc.get("approximate_line_number").and_then(|s| s.as_u64()) {
+                    response_parts.push(format!("   📍 Approximate Line Number: {}", line_num));
+                }
+                if let Some(method) = source_loc.get("context_extraction_method").and_then(|s| s.as_str()) {
+                    response_parts.push(format!("   🔍 Location Method: {}", method));
+                }
+            }
+            
+            response_parts.push("".to_string());
+        }
+        
+        // Workspace information
+        if let Some(workspace) = bug_data.get("workspace_info") {
+            response_parts.push("🌿 Workspace Information:".to_string());
+            if let Some(repo) = workspace.get("repository").and_then(|s| s.as_str()) {
+                response_parts.push(format!("   📚 Repository: {}", repo));
+            }
+            if let Some(branch) = workspace.get("branch").and_then(|s| s.as_str()) {
+                response_parts.push(format!("   🌿 Git Branch: {}", branch));
+            }
+            if let Some(commit) = workspace.get("commit_hash").and_then(|s| s.as_str()) {
+                response_parts.push(format!("   🔗 Commit Hash: {}", commit));
+            }
+            response_parts.push("".to_string());
+        }
+        
+        // Code sample
+        if let Some(code_sample) = bug_data.get("code_sample").and_then(|s| s.as_str()) {
+            if !code_sample.is_empty() && code_sample != "See file content" {
+                response_parts.push("💻 Code Sample:".to_string());
+                response_parts.push("```rust".to_string());
+                response_parts.push(code_sample.to_string());
+                response_parts.push("```".to_string());
+                response_parts.push("".to_string());
+            }
+        }
+        
+        // Fix suggestion
+        if let Some(fix_suggestion) = bug_data.get("fix_suggestion").and_then(|s| s.as_str()) {
+            if !fix_suggestion.is_empty() && fix_suggestion != "Manual review required" {
+                response_parts.push("🔧 Fix Suggestion:".to_string());
+                response_parts.push(format!("   {}", fix_suggestion));
+                response_parts.push("".to_string());
+            }
+        }
+        
+        // Additional metadata
+        if let Some(metadata) = bug_data.get("mcp_metadata") {
+            response_parts.push("🔧 Technical Metadata:".to_string());
+            if let Some(version) = metadata.get("tool_version").and_then(|s| s.as_str()) {
+                response_parts.push(format!("   🛠️ Tool Version: {}", version));
+            }
+            if let Some(method) = metadata.get("submission_method").and_then(|s| s.as_str()) {
+                response_parts.push(format!("   📤 Submission Method: {}", method));
+            }
+        }
+        
+        response_parts.push("".to_string());
+        response_parts.push(format!("📄 Bug file location: {}", bug_file.display()));
+        
+        Ok(CallToolResult::success(vec![Content::text(response_parts.join("\n"))]))
+    }
+
+    #[tool(description = "Store bug analysis as JSON file in bugs directory with enhanced file location tracking")]
     async fn store_bug(
         &self,
         Parameters(BugStoreRequest { 
@@ -502,6 +865,37 @@ impl NautilusMcpServer {
         let adapter_suffix = adapter_name.as_ref().map(|s| format!("_{}", s)).unwrap_or_default();
         let filename = format!("{}/{}{}_{}.json", Config::BUGS_DIRECTORY, bug_id, adapter_suffix, timestamp);
         
+        // Enhanced file location tracking (similar to store_bug_internal)
+        let mut workspace_info = serde_json::Map::new();
+        workspace_info.insert("repository".to_string(), serde_json::Value::String("nautilus_trader".to_string()));
+        
+        // Try to get git information
+        if let Ok(output) = tokio::process::Command::new("git")
+            .args(&["branch", "--show-current"])
+            .output()
+            .await 
+        {
+            if output.status.success() {
+                if let Ok(branch) = String::from_utf8(output.stdout) {
+                    workspace_info.insert("branch".to_string(), 
+                        serde_json::Value::String(branch.trim().to_string()));
+                }
+            }
+        }
+        
+        if let Ok(output) = tokio::process::Command::new("git")
+            .args(&["rev-parse", "HEAD"])
+            .output()
+            .await 
+        {
+            if output.status.success() {
+                if let Ok(commit) = String::from_utf8(output.stdout) {
+                    workspace_info.insert("commit_hash".to_string(), 
+                        serde_json::Value::String(commit.trim().to_string()));
+                }
+            }
+        }
+        
         let bug_data = serde_json::json!({
             "bug_id": bug_id,
             "severity": severity,
@@ -510,14 +904,22 @@ impl NautilusMcpServer {
             "code_sample": code_sample,
             "fix_suggestion": fix_suggestion,
             "timestamp": timestamp,
-            "analysis_context": "Automated detection via RMCP"
+            "analysis_context": "Submitted via MCP interface",
+            "workspace_info": workspace_info,
+            "mcp_metadata": {
+                "tool_version": "nautilus-trader-rig-mcp",
+                "submission_method": "store_bug_tool",
+                "enhanced_tracking": true
+            }
         });
         
         match async_fs::write(&filename, serde_json::to_string_pretty(&bug_data).unwrap()).await {
             Ok(_) => {
-                Ok(CallToolResult::success(vec![Content::text(
-                    format!("✅ Bug stored successfully: {}", filename)
-                )]))
+                let response_msg = format!(
+                    "✅ Bug stored successfully: {}\n📊 Enhanced tracking enabled with workspace metadata\n🔍 Bug ID: {}\n⚠️ Severity: {}",
+                    filename, bug_id, severity
+                );
+                Ok(CallToolResult::success(vec![Content::text(response_msg)]))
             }
             Err(e) => {
                 Ok(CallToolResult::success(vec![Content::text(

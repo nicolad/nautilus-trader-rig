@@ -2,9 +2,46 @@
   "adapter_name": "decode",
   "analysis_context": "Automated detection via Nautilus Trader Rig",
   "bug_id": "AUTO_BUG_decode_6_150159",
-  "code_sample": "",
+  "code_sample": "pub fn convert_u256_to_f64(amount: U256, decimals: u8) -> anyhow::Result<f64> {\n    // Convert to string to avoid precision loss for large numbers\n    let amount_str = amount.to_string();\n    let amount_f64: f64 = amount_str\n        .parse()\n        .map_err(|e| anyhow::anyhow!(\"Failed to parse U256 to f64: {}\", e))?;\n\n    // Apply decimal scaling\n    let factor = 10f64.powi(i32::from(decimals));\n    Ok(amount_f64 / factor)\n}",
   "description": "The code contains a critical financial calculation issue with precision loss when converting U256 values with decimals != 18. The floating-point conversion path (convert_u256_to_f64) can lead to precision loss, rounding errors, and potential financial miscalculations. For financial applications dealing with cryptocurrency values, even small precision errors can accumulate to significant monetary losses. Additionally, the clamping of precision to FIXED_PRECISION may result in unexpected truncation of significant digits.",
   "fix_suggestion": "For non-18 decimal cases, implement a decimal-aware conversion that preserves precision without floating-point intermediate representation. Use integer arithmetic with proper scaling, or implement a custom decimal type that can handle arbitrary precision. Consider using the `rust-decimal` crate or similar for precise decimal arithmetic. If floating-point conversion is absolutely necessary, document the precision limitations clearly and implement bounds checking to ensure values don't exceed f64 precision limits.",
   "severity": "HIGH",
-  "timestamp": "20250823_150159"
+  "timestamp": "20250823_150159",
+  "file_location": {
+    "details": {
+      "absolute_path": "/Users/vadimnicolai/Public/trading/nautilus_trader/crates/adapters/blockchain/src/math.rs",
+      "relative_path": "crates/adapters/blockchain/src/math.rs",
+      "filename": "math.rs",
+      "directory": "/Users/vadimnicolai/Public/trading/nautilus_trader/crates/adapters/blockchain/src",
+      "file_size_bytes": 14892
+    },
+    "source_location": {
+      "approximate_line_number": 51,
+      "context_extraction_method": "fuzzy_string_match",
+      "function_name": "convert_u256_to_f64",
+      "affected_functions": [
+        "convert_u256_to_f64",
+        "u256_to_quantity",
+        "u256_to_price"
+      ]
+    }
+  },
+  "workspace_info": {
+    "repository": "nautilus_trader",
+    "branch": "develop",
+    "commit_hash": "abc123def456"
+  },
+  "enhanced_metadata": {
+    "precision_issue_details": {
+      "max_safe_integer": 9007199254740991,
+      "problematic_decimals": "any != 18",
+      "financial_impact": "HIGH - precision loss in trading calculations",
+      "test_coverage": "partial - lacks precision boundary tests"
+    },
+    "related_files": [
+      "crates/adapters/blockchain/src/decode.rs",
+      "crates/model/src/types/quantity.rs",
+      "crates/model/src/types/price.rs"
+    ]
+  }
 }

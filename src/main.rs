@@ -266,7 +266,7 @@ async fn discover_rust_files(adapters_path: &str) -> Result<Vec<String>> {
     Ok(rust_files)
 }
 
-// Function to analyze adapter files for bugs and store results
+// Function to analyze adapter files for bugs and store results with enhanced location tracking
 async fn analyze_adapter_files_for_bugs(state: &UnifiedServerState) -> Result<()> {
     println!("\n🔍 Starting automated bug analysis on adapter files...");
     info!("Beginning automated bug analysis workflow");
@@ -289,6 +289,7 @@ async fn analyze_adapter_files_for_bugs(state: &UnifiedServerState) -> Result<()
 
     let mut bugs_found = 0;
     let mut files_analyzed = 0;
+    let mut analysis_results = Vec::new();
 
     // Analyze each file
     for (i, file_path) in rust_files.iter().enumerate() {
@@ -306,34 +307,57 @@ async fn analyze_adapter_files_for_bugs(state: &UnifiedServerState) -> Result<()
             Err(e) => {
                 println!("   ❌ Failed to read file: {}", e);
                 warn!("Skipping file due to read error: {} - {}", file_path, e);
+                analysis_results.push(serde_json::json!({
+                    "file_path": file_path,
+                    "status": "error",
+                    "error": format!("Failed to read file: {}", e),
+                    "timestamp": chrono::Utc::now().to_rfc3339()
+                }));
                 continue;
             }
         };
 
         files_analyzed += 1;
 
+        // Get file metadata for enhanced reporting
+        let file_metadata = match tokio::fs::metadata(file_path).await {
+            Ok(metadata) => Some(serde_json::json!({
+                "size_bytes": metadata.len(),
+                "lines_of_code": content.lines().count(),
+                "last_modified": metadata.modified()
+                    .ok()
+                    .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                    .map(|d| d.as_secs())
+            })),
+            Err(_) => None,
+        };
+
         // Analyze with DeepSeek
         if let Some(deepseek_client) = &state.deepseek_client {
             let analysis_prompt = format!(
                 "Analyze this Rust code for critical bugs, security vulnerabilities, and potential issues:\n\n\
-                 File: {}\n\n\
+                 File: {}\n\
+                 Lines of code: {}\n\n\
                  ```rust\n{}\n```\n\n\
                  Focus on:\n\
                  - Security vulnerabilities (buffer overflows, injection attacks, etc.)\n\
                  - Memory safety issues\n\
                  - Logic errors that could cause financial losses\n\
                  - Performance bottlenecks\n\
-                 - Error handling problems\n\n\
+                 - Error handling problems\n\
+                 - Precision loss in financial calculations (especially with f64 conversions)\n\
+                 - Type safety issues\n\n\
                  If you find critical issues, respond with:\n\
                  BUG_FOUND: yes\n\
                  SEVERITY: [CRITICAL|HIGH|MEDIUM|LOW]\n\
                  DESCRIPTION: [detailed description]\n\
-                 CODE_SAMPLE: [relevant code snippet]\n\
-                 FIX_SUGGESTION: [how to fix it]\n\n\
+                 CODE_SAMPLE: [relevant code snippet with function/line context]\n\
+                 FIX_SUGGESTION: [how to fix it]\n\
+                 AFFECTED_FUNCTIONS: [list of function names affected]\n\n\
                  If no critical issues found, respond with:\n\
                  BUG_FOUND: no\n\
                  ANALYSIS: [brief analysis summary]",
-                file_path, content
+                file_path, content.lines().count(), content
             );
 
             match deepseek_client.analyze_code(&analysis_prompt).await {
@@ -349,7 +373,7 @@ async fn analyze_adapter_files_for_bugs(state: &UnifiedServerState) -> Result<()
                         bugs_found += 1;
                         println!("   🐛 Bug detected! Storing analysis...");
 
-                        // Extract bug details (simplified parsing)
+                        // Extract bug details with enhanced parsing
                         let severity = extract_field(&analysis_result, "SEVERITY")
                             .unwrap_or("MEDIUM".to_string());
                         let description = extract_field(&analysis_result, "DESCRIPTION")
@@ -358,8 +382,10 @@ async fn analyze_adapter_files_for_bugs(state: &UnifiedServerState) -> Result<()
                             .unwrap_or("See file content".to_string());
                         let fix_suggestion = extract_field(&analysis_result, "FIX_SUGGESTION")
                             .unwrap_or("Manual review required".to_string());
+                        let affected_functions = extract_field(&analysis_result, "AFFECTED_FUNCTIONS")
+                            .unwrap_or("Unknown".to_string());
 
-                        // Generate bug ID
+                        // Generate enhanced bug ID with more context
                         let file_name = std::path::Path::new(file_path)
                             .file_stem()
                             .and_then(|s| s.to_str())
@@ -371,7 +397,7 @@ async fn analyze_adapter_files_for_bugs(state: &UnifiedServerState) -> Result<()
                             chrono::Utc::now().format("%H%M%S")
                         );
 
-                        // Store bug using internal function (simulating MCP call)
+                        // Store bug using enhanced internal function
                         match store_bug_internal(
                             &bug_id,
                             &severity,
@@ -386,34 +412,121 @@ async fn analyze_adapter_files_for_bugs(state: &UnifiedServerState) -> Result<()
                             Ok(filename) => {
                                 println!("   ✅ Bug stored: {}", filename);
                                 info!("Bug {} stored successfully: {}", bug_id, filename);
+                                
+                                analysis_results.push(serde_json::json!({
+                                    "file_path": file_path,
+                                    "status": "bug_found",
+                                    "bug_id": bug_id,
+                                    "severity": severity,
+                                    "affected_functions": affected_functions,
+                                    "bug_file": filename,
+                                    "file_metadata": file_metadata,
+                                    "timestamp": chrono::Utc::now().to_rfc3339()
+                                }));
                             }
                             Err(e) => {
                                 println!("   ❌ Failed to store bug: {}", e);
                                 error!("Failed to store bug {}: {}", bug_id, e);
+                                
+                                analysis_results.push(serde_json::json!({
+                                    "file_path": file_path,
+                                    "status": "bug_found_but_storage_failed",
+                                    "bug_id": bug_id,
+                                    "storage_error": format!("{}", e),
+                                    "timestamp": chrono::Utc::now().to_rfc3339()
+                                }));
                             }
                         }
                     } else {
                         println!("   ✅ No critical issues found");
                         debug!("File analysis clean: {}", file_path);
+                        
+                        analysis_results.push(serde_json::json!({
+                            "file_path": file_path,
+                            "status": "clean",
+                            "file_metadata": file_metadata,
+                            "timestamp": chrono::Utc::now().to_rfc3339()
+                        }));
                     }
                 }
                 Err(e) => {
                     println!("   ❌ Analysis failed: {}", e);
                     error!("DeepSeek analysis failed for {}: {}", file_path, e);
+                    
+                    analysis_results.push(serde_json::json!({
+                        "file_path": file_path,
+                        "status": "analysis_failed",
+                        "error": format!("{}", e),
+                        "file_metadata": file_metadata,
+                        "timestamp": chrono::Utc::now().to_rfc3339()
+                    }));
                 }
             }
         } else {
             println!("   ⚠️ DeepSeek client not available");
             warn!("Skipping analysis - DeepSeek client not initialized");
+            
+            analysis_results.push(serde_json::json!({
+                "file_path": file_path,
+                "status": "skipped_no_client",
+                "file_metadata": file_metadata,
+                "timestamp": chrono::Utc::now().to_rfc3339()
+            }));
         }
 
         // Add small delay to avoid rate limiting
         tokio::time::sleep(std::time::Duration::from_millis(500)).await;
     }
 
+    // Store comprehensive analysis summary
+    let summary_report = serde_json::json!({
+        "analysis_summary": {
+            "total_files_discovered": rust_files.len(),
+            "files_analyzed": files_analyzed,
+            "bugs_found": bugs_found,
+            "analysis_timestamp": chrono::Utc::now().to_rfc3339(),
+            "workspace_info": {
+                "adapters_path": adapters_path.display().to_string(),
+                "repository": "nautilus_trader",
+                "branch": get_git_branch().await.unwrap_or_else(|| "unknown".to_string())
+            }
+        },
+        "file_results": analysis_results
+    });
+
+    // Store summary report
+    let bugs_dir = config::Config::bugs_directory_path();
+    let summary_filename = bugs_dir.join(format!(
+        "analysis_summary_{}.json",
+        chrono::Utc::now().format("%Y%m%d_%H%M%S")
+    ));
+    
+    if let Err(e) = tokio::fs::write(&summary_filename, serde_json::to_string_pretty(&summary_report)?).await {
+        error!("Failed to write analysis summary: {}", e);
+    } else {
+        println!("📊 Analysis summary saved to: {}", summary_filename.display());
+        info!("Analysis summary saved: {}", summary_filename.display());
+    }
+
     println!("\n📊 Bug analysis completed:");
     println!("   📄 Files analyzed: {}", files_analyzed);
     println!("   🐛 Bugs found: {}", bugs_found);
+    println!("   📋 Summary report: {}", summary_filename.display());
+
+    // Print file-by-file results
+    if bugs_found > 0 {
+        println!("\n🔍 Files with bugs detected:");
+        for result in &analysis_results {
+            if result["status"] == "bug_found" {
+                println!(
+                    "   • {} (Bug ID: {}, Severity: {})",
+                    result["file_path"],
+                    result["bug_id"],
+                    result["severity"]
+                );
+            }
+        }
+    }
 
     info!(
         "Bug analysis workflow completed: {} files analyzed, {} bugs found",
@@ -437,7 +550,7 @@ fn extract_field(text: &str, field_name: &str) -> Option<String> {
     None
 }
 
-// Internal function to store bugs (simulating MCP store_bug call)
+// Internal function to store bugs with enhanced file location tracking
 async fn store_bug_internal(
     bug_id: &str,
     severity: &str,
@@ -455,6 +568,59 @@ async fn store_bug_internal(
     let bugs_dir = config::Config::bugs_directory_path();
     let filename = bugs_dir.join(format!("{}{}_{}.json", bug_id, adapter_suffix, timestamp));
 
+    // Enhanced file location information
+    let mut file_details = serde_json::Map::new();
+    if let Some(path) = &file_path {
+        file_details.insert("absolute_path".to_string(), serde_json::Value::String(path.clone()));
+        
+        // Extract relative path from workspace root
+        if let Ok(workspace_root) = std::env::current_dir() {
+            if let Ok(relative_path) = std::path::Path::new(path).strip_prefix(&workspace_root) {
+                file_details.insert("relative_path".to_string(), 
+                    serde_json::Value::String(relative_path.display().to_string()));
+            }
+        }
+        
+        // Extract filename and directory information
+        let path_obj = std::path::Path::new(path);
+        if let Some(filename) = path_obj.file_name() {
+            file_details.insert("filename".to_string(), 
+                serde_json::Value::String(filename.to_string_lossy().to_string()));
+        }
+        if let Some(parent) = path_obj.parent() {
+            file_details.insert("directory".to_string(), 
+                serde_json::Value::String(parent.display().to_string()));
+        }
+        
+        // Check if file exists and get metadata
+        if let Ok(metadata) = tokio::fs::metadata(path).await {
+            file_details.insert("file_size_bytes".to_string(), 
+                serde_json::Value::Number(serde_json::Number::from(metadata.len())));
+            if let Ok(modified) = metadata.modified() {
+                if let Ok(duration) = modified.duration_since(std::time::UNIX_EPOCH) {
+                    file_details.insert("last_modified_timestamp".to_string(), 
+                        serde_json::Value::Number(serde_json::Number::from(duration.as_secs())));
+                }
+            }
+        }
+    }
+
+    // Try to extract line numbers from code sample if available
+    let mut location_details = serde_json::Map::new();
+    if !code_sample.is_empty() && file_path.is_some() {
+        if let Some(path) = &file_path {
+            if let Ok(file_content) = tokio::fs::read_to_string(path).await {
+                // Find the approximate line number where the code sample appears
+                if let Some(line_number) = find_code_in_file(&file_content, code_sample) {
+                    location_details.insert("approximate_line_number".to_string(), 
+                        serde_json::Value::Number(serde_json::Number::from(line_number)));
+                    location_details.insert("context_extraction_method".to_string(), 
+                        serde_json::Value::String("fuzzy_string_match".to_string()));
+                }
+            }
+        }
+    }
+
     let bug_data = serde_json::json!({
         "bug_id": bug_id,
         "severity": severity,
@@ -462,9 +628,17 @@ async fn store_bug_internal(
         "adapter_name": adapter_name,
         "code_sample": code_sample,
         "fix_suggestion": fix_suggestion,
-        "file_path": file_path,
         "timestamp": timestamp,
-        "analysis_context": "Automated detection via Nautilus Trader Rig"
+        "analysis_context": "Automated detection via Nautilus Trader Rig",
+        "file_location": {
+            "details": file_details,
+            "source_location": location_details
+        },
+        "workspace_info": {
+            "repository": "nautilus_trader",
+            "branch": get_git_branch().await.unwrap_or_else(|| "unknown".to_string()),
+            "commit_hash": get_git_commit_hash().await.unwrap_or_else(|| "unknown".to_string())
+        }
     });
 
     // Ensure bugs directory exists
@@ -473,6 +647,65 @@ async fn store_bug_internal(
     tokio::fs::write(&filename, serde_json::to_string_pretty(&bug_data)?).await?;
 
     Ok(filename.to_string_lossy().to_string())
+}
+
+// Helper function to find approximate line number of code in file
+fn find_code_in_file(file_content: &str, code_sample: &str) -> Option<usize> {
+    // Clean up code sample for better matching
+    let cleaned_sample = code_sample
+        .lines()
+        .map(|line| line.trim())
+        .filter(|line| !line.is_empty() && !line.starts_with("//"))
+        .collect::<Vec<_>>()
+        .join(" ");
+    
+    if cleaned_sample.is_empty() {
+        return None;
+    }
+    
+    // Look for the first substantial line from the code sample
+    for (line_num, line) in file_content.lines().enumerate() {
+        let cleaned_line = line.trim();
+        if !cleaned_line.is_empty() && cleaned_sample.contains(cleaned_line) {
+            return Some(line_num + 1); // 1-indexed line numbers
+        }
+    }
+    
+    None
+}
+
+// Helper function to get current git branch
+async fn get_git_branch() -> Option<String> {
+    let output = tokio::process::Command::new("git")
+        .args(&["branch", "--show-current"])
+        .output()
+        .await
+        .ok()?;
+    
+    if output.status.success() {
+        String::from_utf8(output.stdout)
+            .ok()
+            .map(|s| s.trim().to_string())
+    } else {
+        None
+    }
+}
+
+// Helper function to get current git commit hash
+async fn get_git_commit_hash() -> Option<String> {
+    let output = tokio::process::Command::new("git")
+        .args(&["rev-parse", "HEAD"])
+        .output()
+        .await
+        .ok()?;
+    
+    if output.status.success() {
+        String::from_utf8(output.stdout)
+            .ok()
+            .map(|s| s.trim().to_string())
+    } else {
+        None
+    }
 }
 
 // Function to test improvement analyzer
