@@ -1,0 +1,20 @@
+{
+  "adapter_name": "client",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R121_client_L188",
+  "code_sample": "            url: self.endpoint.clone(),",
+  "description": "Performance detected: clone()",
+  "file_location": {
+    "column": 31,
+    "line": 188,
+    "relative_path": "../crates/adapters/coinbase_intx/src/fix/client.rs"
+  },
+  "fix_suggestion": "Review performance pattern usage",
+  "pattern_id": "R121",
+  "severity": "High",
+  "timestamp": "20250826_112741",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "adapter_name": "loader",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R009_loader_L104",
+  "code_sample": "        let list = PyList::new(py, &data).expect(\"Invalid `ExactSizeIterator`\");",
+  "description": "ErrorHandling detected: expect()",
+  "file_location": {
+    "column": 42,
+    "line": 104,
+    "relative_path": "../crates/adapters/databento/src/python/loader.rs"
+  },
+  "fix_suggestion": "Review errorhandling pattern usage",
+  "pattern_id": "R009",
+  "severity": "High",
+  "timestamp": "20250826_112746",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

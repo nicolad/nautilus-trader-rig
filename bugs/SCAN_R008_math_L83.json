@@ -1,0 +1,20 @@
+{
+  "adapter_name": "math",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R008_math_L83",
+  "code_sample": "        let amount = I256::from_str(\"1000000000000000000\").unwrap();",
+  "description": "ErrorHandling detected: unwrap()",
+  "file_location": {
+    "column": 59,
+    "line": 83,
+    "relative_path": "../crates/adapters/blockchain/src/math.rs"
+  },
+  "fix_suggestion": "Review errorhandling pattern usage",
+  "pattern_id": "R008",
+  "severity": "High",
+  "timestamp": "20250826_112743",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

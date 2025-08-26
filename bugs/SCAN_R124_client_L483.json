@@ -1,0 +1,20 @@
+{
+  "adapter_name": "client",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R124_client_L483",
+  "code_sample": "        ClientId::from(format!(\"BLOCKCHAIN-{}\", self.chain.name).as_str())",
+  "description": "Performance detected: format!(one slot)",
+  "file_location": {
+    "column": 24,
+    "line": 483,
+    "relative_path": "../crates/adapters/blockchain/src/data/client.rs"
+  },
+  "fix_suggestion": "Review performance pattern usage",
+  "pattern_id": "R124",
+  "severity": "High",
+  "timestamp": "20250826_112743",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

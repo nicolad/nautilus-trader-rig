@@ -1,0 +1,20 @@
+{
+  "adapter_name": "parse",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R009_parse_L1424",
+  "code_sample": "        let okx_trade = response.data.first().expect(\"Test data must have a trade\");",
+  "description": "ErrorHandling detected: expect()",
+  "file_location": {
+    "column": 46,
+    "line": 1424,
+    "relative_path": "../crates/adapters/okx/src/common/parse.rs"
+  },
+  "fix_suggestion": "Review errorhandling pattern usage",
+  "pattern_id": "R009",
+  "severity": "High",
+  "timestamp": "20250826_112737",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

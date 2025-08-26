@@ -1,0 +1,20 @@
+{
+  "adapter_name": "machine",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R009_machine_L48",
+  "code_sample": "        serde_json::from_slice(&data).expect(\"Failed to parse JSON\")",
+  "description": "ErrorHandling detected: expect()",
+  "file_location": {
+    "column": 38,
+    "line": 48,
+    "relative_path": "../crates/adapters/tardis/src/python/machine.rs"
+  },
+  "fix_suggestion": "Review errorhandling pattern usage",
+  "pattern_id": "R009",
+  "severity": "High",
+  "timestamp": "20250826_112744",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

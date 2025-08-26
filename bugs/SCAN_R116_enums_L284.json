@@ -1,0 +1,20 @@
+{
+  "adapter_name": "enums",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R116_enums_L284",
+  "code_sample": "        *self as u8",
+  "description": "Casting detected: float->int as",
+  "file_location": {
+    "column": 15,
+    "line": 284,
+    "relative_path": "../crates/adapters/okx/src/python/enums.rs"
+  },
+  "fix_suggestion": "Review casting pattern usage",
+  "pattern_id": "R116",
+  "severity": "High",
+  "timestamp": "20250826_112736",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

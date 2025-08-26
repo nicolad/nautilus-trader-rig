@@ -1,0 +1,20 @@
+{
+  "adapter_name": "parse",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R116_parse_L166",
+  "code_sample": "        UnixNanos::from(margin.timestamp.timestamp_nanos_opt().unwrap_or_default() as u64);",
+  "description": "Casting detected: float->int as",
+  "file_location": {
+    "column": 84,
+    "line": 166,
+    "relative_path": "../crates/adapters/bitmex/src/common/parse.rs"
+  },
+  "fix_suggestion": "Review casting pattern usage",
+  "pattern_id": "R116",
+  "severity": "High",
+  "timestamp": "20250826_112739",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

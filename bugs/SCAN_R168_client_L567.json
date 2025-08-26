@@ -1,0 +1,20 @@
+{
+  "adapter_name": "client",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R168_client_L567",
+  "code_sample": "    pub(crate) instruments_cache: Arc<Mutex<HashMap<Ustr, InstrumentAny>>>,",
+  "description": "Performance detected: Arc<Mutex<_>>",
+  "file_location": {
+    "column": 35,
+    "line": 567,
+    "relative_path": "../crates/adapters/okx/src/http/client.rs"
+  },
+  "fix_suggestion": "Review performance pattern usage",
+  "pattern_id": "R168",
+  "severity": "High",
+  "timestamp": "20250826_112737",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

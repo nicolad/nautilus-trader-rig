@@ -1,0 +1,20 @@
+{
+  "adapter_name": "parse",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R005_parse_L940",
+  "code_sample": "        assert_eq!(instrument.min_quantity(), Some(Quantity::from(\"0.1\")));",
+  "description": "Panic detected: assert_eq!",
+  "file_location": {
+    "column": 9,
+    "line": 940,
+    "relative_path": "../crates/adapters/tardis/src/http/parse.rs"
+  },
+  "fix_suggestion": "Review panic pattern usage",
+  "pattern_id": "R005",
+  "severity": "High",
+  "timestamp": "20250826_090106",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

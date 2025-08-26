@@ -1,0 +1,20 @@
+{
+  "adapter_name": "math",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R005_math_L105",
+  "code_sample": "        assert_eq!(result, 0.0);",
+  "description": "Panic detected: assert_eq!",
+  "file_location": {
+    "column": 9,
+    "line": 105,
+    "relative_path": "../crates/adapters/blockchain/src/math.rs"
+  },
+  "fix_suggestion": "Review panic pattern usage",
+  "pattern_id": "R005",
+  "severity": "High",
+  "timestamp": "20250826_090104",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

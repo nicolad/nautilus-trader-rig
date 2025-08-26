@@ -1,0 +1,20 @@
+{
+  "adapter_name": "data",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R067_data_L717",
+  "code_sample": "                    // TODO: Send quotes to message bus",
+  "description": "Style detected: TODO comment",
+  "file_location": {
+    "column": 24,
+    "line": 717,
+    "relative_path": "../crates/adapters/databento/src/data.rs"
+  },
+  "fix_suggestion": "Review style pattern usage",
+  "pattern_id": "R067",
+  "severity": "High",
+  "timestamp": "20250826_112747",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

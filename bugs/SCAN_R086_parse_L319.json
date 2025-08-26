@@ -1,0 +1,20 @@
+{
+  "adapter_name": "parse",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R086_parse_L319",
+  "code_sample": "    let ts_accepted = UnixNanos::from(coinbase_order.submit_time.unwrap_or_default());",
+  "description": "ErrorHandling detected: unwrap_or_default()",
+  "file_location": {
+    "column": 65,
+    "line": 319,
+    "relative_path": "../crates/adapters/coinbase_intx/src/http/parse.rs"
+  },
+  "fix_suggestion": "Review errorhandling pattern usage",
+  "pattern_id": "R086",
+  "severity": "High",
+  "timestamp": "20250826_112741",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

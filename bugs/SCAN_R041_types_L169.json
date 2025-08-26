@@ -1,0 +1,20 @@
+{
+  "adapter_name": "types",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R041_types_L169",
+  "code_sample": "        hasher.finish() as isize",
+  "description": "Casting detected: as numeric cast",
+  "file_location": {
+    "column": 25,
+    "line": 169,
+    "relative_path": "../crates/adapters/databento/src/python/types.rs"
+  },
+  "fix_suggestion": "Review casting pattern usage",
+  "pattern_id": "R041",
+  "severity": "High",
+  "timestamp": "20250826_112746",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

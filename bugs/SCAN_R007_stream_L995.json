@@ -1,0 +1,20 @@
+{
+  "adapter_name": "stream",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R007_stream_L995",
+  "code_sample": "                _ => unreachable!(),",
+  "description": "Panic detected: unreachable!",
+  "file_location": {
+    "column": 22,
+    "line": 995,
+    "relative_path": "../crates/adapters/tardis/src/csv/stream.rs"
+  },
+  "fix_suggestion": "Review panic pattern usage",
+  "pattern_id": "R007",
+  "severity": "High",
+  "timestamp": "20250826_112745",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "adapter_name": "decode",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R008_decode_L1546",
+  "code_sample": "            .unwrap()",
+  "description": "ErrorHandling detected: unwrap()",
+  "file_location": {
+    "column": 13,
+    "line": 1546,
+    "relative_path": "../crates/adapters/databento/src/decode.rs"
+  },
+  "fix_suggestion": "Review errorhandling pattern usage",
+  "pattern_id": "R008",
+  "severity": "High",
+  "timestamp": "20250826_112747",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

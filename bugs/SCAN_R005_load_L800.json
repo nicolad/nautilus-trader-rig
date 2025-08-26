@@ -1,0 +1,20 @@
+{
+  "adapter_name": "load",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R005_load_L800",
+  "code_sample": "        assert_eq!(deltas[1].order.price, parse_price(49999.5, 4));",
+  "description": "Panic detected: assert_eq!",
+  "file_location": {
+    "column": 9,
+    "line": 800,
+    "relative_path": "../crates/adapters/tardis/src/csv/load.rs"
+  },
+  "fix_suggestion": "Review panic pattern usage",
+  "pattern_id": "R005",
+  "severity": "High",
+  "timestamp": "20250826_090107",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

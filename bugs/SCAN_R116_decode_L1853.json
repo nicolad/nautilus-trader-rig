@@ -1,0 +1,20 @@
+{
+  "adapter_name": "decode",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R116_decode_L1853",
+  "code_sample": "            msg.levels[i].ask_sz = 10 + i as u32;",
+  "description": "Casting detected: float->int as",
+  "file_location": {
+    "column": 43,
+    "line": 1853,
+    "relative_path": "../crates/adapters/databento/src/decode.rs"
+  },
+  "fix_suggestion": "Review casting pattern usage",
+  "pattern_id": "R116",
+  "severity": "High",
+  "timestamp": "20250826_112747",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

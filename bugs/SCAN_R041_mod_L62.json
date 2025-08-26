@@ -1,0 +1,20 @@
+{
+  "adapter_name": "mod",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R041_mod_L62",
+  "code_sample": "        Some((_, frac)) if frac != \"0\" => frac.len() as u8,",
+  "description": "Casting detected: as numeric cast",
+  "file_location": {
+    "column": 54,
+    "line": 62,
+    "relative_path": "../crates/adapters/tardis/src/csv/mod.rs"
+  },
+  "fix_suggestion": "Review casting pattern usage",
+  "pattern_id": "R041",
+  "severity": "High",
+  "timestamp": "20250826_112745",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

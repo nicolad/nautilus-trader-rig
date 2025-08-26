@@ -1,0 +1,20 @@
+{
+  "adapter_name": "mod",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R116_mod_L259",
+  "code_sample": "                        .map(|tick_spacing| tick_spacing as u32),",
+  "description": "Casting detected: float->int as",
+  "file_location": {
+    "column": 58,
+    "line": 259,
+    "relative_path": "../crates/adapters/blockchain/src/cache/mod.rs"
+  },
+  "fix_suggestion": "Review casting pattern usage",
+  "pattern_id": "R116",
+  "severity": "High",
+  "timestamp": "20250826_112742",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

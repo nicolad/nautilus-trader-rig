@@ -1,0 +1,20 @@
+{
+  "adapter_name": "live",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R121_live_L142",
+  "code_sample": "                .dataset(self.dataset.clone())",
+  "description": "Performance detected: clone()",
+  "file_location": {
+    "column": 38,
+    "line": 142,
+    "relative_path": "../crates/adapters/databento/src/live.rs"
+  },
+  "fix_suggestion": "Review performance pattern usage",
+  "pattern_id": "R121",
+  "severity": "High",
+  "timestamp": "20250826_112747",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

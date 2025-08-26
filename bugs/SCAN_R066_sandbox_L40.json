@@ -1,0 +1,20 @@
+{
+  "adapter_name": "sandbox",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R066_sandbox_L40",
+  "code_sample": "            println!(\"{msg:#?}\");",
+  "description": "Style detected: println! left",
+  "file_location": {
+    "column": 13,
+    "line": 40,
+    "relative_path": "../crates/adapters/databento/bin/sandbox.rs"
+  },
+  "fix_suggestion": "Review style pattern usage",
+  "pattern_id": "R066",
+  "severity": "High",
+  "timestamp": "20250826_112746",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

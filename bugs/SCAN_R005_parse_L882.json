@@ -1,0 +1,20 @@
+{
+  "adapter_name": "parse",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R005_parse_L882",
+  "code_sample": "        assert_eq!(report.ts_last, 1732530900789000000); // 2024-11-25T10:35:00.789Z",
+  "description": "Panic detected: assert_eq!",
+  "file_location": {
+    "column": 9,
+    "line": 882,
+    "relative_path": "../crates/adapters/bitmex/src/websocket/parse.rs"
+  },
+  "fix_suggestion": "Review panic pattern usage",
+  "pattern_id": "R005",
+  "severity": "High",
+  "timestamp": "20250826_090059",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

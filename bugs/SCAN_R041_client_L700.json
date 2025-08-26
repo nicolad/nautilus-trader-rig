@@ -1,0 +1,20 @@
+{
+  "adapter_name": "client",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R041_client_L700",
+  "code_sample": "            chrono::Utc::now().timestamp_nanos_opt().unwrap_or_default() as u64,",
+  "description": "Casting detected: as numeric cast",
+  "file_location": {
+    "column": 74,
+    "line": 700,
+    "relative_path": "../crates/adapters/bitmex/src/http/client.rs"
+  },
+  "fix_suggestion": "Review casting pattern usage",
+  "pattern_id": "R041",
+  "severity": "High",
+  "timestamp": "20250826_112739",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

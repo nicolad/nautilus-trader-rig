@@ -1,0 +1,20 @@
+{
+  "adapter_name": "stream",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R121_stream_L792",
+  "code_sample": "                    return Some(Ok(self.buffer.clone()));",
+  "description": "Performance detected: clone()",
+  "file_location": {
+    "column": 47,
+    "line": 792,
+    "relative_path": "../crates/adapters/tardis/src/csv/stream.rs"
+  },
+  "fix_suggestion": "Review performance pattern usage",
+  "pattern_id": "R121",
+  "severity": "High",
+  "timestamp": "20250826_112745",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

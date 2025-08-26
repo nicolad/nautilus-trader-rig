@@ -1,0 +1,20 @@
+{
+  "adapter_name": "live",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R033_live_L437",
+  "code_sample": "                        std::thread::sleep(sleep_duration);",
+  "description": "Async detected: thread::sleep in async fn",
+  "file_location": {
+    "column": 30,
+    "line": 437,
+    "relative_path": "../crates/adapters/databento/src/live.rs"
+  },
+  "fix_suggestion": "Review async pattern usage",
+  "pattern_id": "R033",
+  "severity": "High",
+  "timestamp": "20250826_112747",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

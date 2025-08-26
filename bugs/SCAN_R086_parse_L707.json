@@ -1,0 +1,20 @@
+{
+  "adapter_name": "parse",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R086_parse_L707",
+  "code_sample": "        .unwrap_or_default()",
+  "description": "ErrorHandling detected: unwrap_or_default()",
+  "file_location": {
+    "column": 9,
+    "line": 707,
+    "relative_path": "../crates/adapters/tardis/src/http/parse.rs"
+  },
+  "fix_suggestion": "Review errorhandling pattern usage",
+  "pattern_id": "R086",
+  "severity": "High",
+  "timestamp": "20250826_112744",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

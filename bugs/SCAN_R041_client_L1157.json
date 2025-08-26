@@ -1,0 +1,20 @@
+{
+  "adapter_name": "client",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R041_client_L1157",
+  "code_sample": "                .map(|l| (l as usize).saturating_sub(out.len()))",
+  "description": "Casting detected: as numeric cast",
+  "file_location": {
+    "column": 29,
+    "line": 1157,
+    "relative_path": "../crates/adapters/okx/src/http/client.rs"
+  },
+  "fix_suggestion": "Review casting pattern usage",
+  "pattern_id": "R041",
+  "severity": "High",
+  "timestamp": "20250826_112737",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

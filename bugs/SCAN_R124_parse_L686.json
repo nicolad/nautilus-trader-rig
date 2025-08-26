@@ -1,0 +1,20 @@
+{
+  "adapter_name": "parse",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R124_parse_L686",
+  "code_sample": "        Quantity::from(format!(\"{}\", 10.0_f64.powi(exponent)))",
+  "description": "Performance detected: format!(one slot)",
+  "file_location": {
+    "column": 24,
+    "line": 686,
+    "relative_path": "../crates/adapters/tardis/src/http/parse.rs"
+  },
+  "fix_suggestion": "Review performance pattern usage",
+  "pattern_id": "R124",
+  "severity": "High",
+  "timestamp": "20250826_112744",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

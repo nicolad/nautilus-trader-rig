@@ -1,0 +1,20 @@
+{
+  "adapter_name": "enums",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R041_enums_L32",
+  "code_sample": "        *self as isize",
+  "description": "Casting detected: as numeric cast",
+  "file_location": {
+    "column": 15,
+    "line": 32,
+    "relative_path": "../crates/adapters/databento/src/python/enums.rs"
+  },
+  "fix_suggestion": "Review casting pattern usage",
+  "pattern_id": "R041",
+  "severity": "High",
+  "timestamp": "20250826_112746",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

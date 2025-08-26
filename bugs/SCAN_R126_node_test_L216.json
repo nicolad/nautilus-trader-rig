@@ -1,0 +1,20 @@
+{
+  "adapter_name": "node_test",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R126_node_test_L216",
+  "code_sample": "            received_trades: Vec::new(),",
+  "description": "Performance detected: Vec::new() no capacity",
+  "file_location": {
+    "column": 30,
+    "line": 216,
+    "relative_path": "../crates/adapters/databento/bin/node_test.rs"
+  },
+  "fix_suggestion": "Review performance pattern usage",
+  "pattern_id": "R126",
+  "severity": "High",
+  "timestamp": "20250826_112746",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

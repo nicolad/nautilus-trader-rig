@@ -1,0 +1,20 @@
+{
+  "adapter_name": "websocket",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R121_websocket_L737",
+  "code_sample": "        let client = self.clone();",
+  "description": "Performance detected: clone()",
+  "file_location": {
+    "column": 26,
+    "line": 737,
+    "relative_path": "../crates/adapters/okx/src/python/websocket.rs"
+  },
+  "fix_suggestion": "Review performance pattern usage",
+  "pattern_id": "R121",
+  "severity": "High",
+  "timestamp": "20250826_112736",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

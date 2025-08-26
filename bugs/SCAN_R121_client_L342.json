@@ -1,0 +1,20 @@
+{
+  "adapter_name": "client",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R121_client_L342",
+  "code_sample": "        self.instruments_cache = Arc::new(instruments_map.clone());",
+  "description": "Performance detected: clone()",
+  "file_location": {
+    "column": 58,
+    "line": 342,
+    "relative_path": "../crates/adapters/okx/src/websocket/client.rs"
+  },
+  "fix_suggestion": "Review performance pattern usage",
+  "pattern_id": "R121",
+  "severity": "High",
+  "timestamp": "20250826_112735",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

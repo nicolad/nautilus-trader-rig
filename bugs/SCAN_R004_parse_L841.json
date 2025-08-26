@@ -1,0 +1,20 @@
+{
+  "adapter_name": "parse",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R004_parse_L841",
+  "code_sample": "        assert!(instrument.is_inverse());",
+  "description": "Panic detected: assert!",
+  "file_location": {
+    "column": 9,
+    "line": 841,
+    "relative_path": "../crates/adapters/tardis/src/http/parse.rs"
+  },
+  "fix_suggestion": "Review panic pattern usage",
+  "pattern_id": "R004",
+  "severity": "High",
+  "timestamp": "20250826_090106",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

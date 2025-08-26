@@ -1,0 +1,20 @@
+{
+  "adapter_name": "messages",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R069_messages_L17",
+  "code_sample": "#![allow(dead_code)]",
+  "description": "Style detected: allow(dead_code)",
+  "file_location": {
+    "column": 1,
+    "line": 17,
+    "relative_path": "../crates/adapters/coinbase_intx/src/fix/messages.rs"
+  },
+  "fix_suggestion": "Review style pattern usage",
+  "pattern_id": "R069",
+  "severity": "High",
+  "timestamp": "20250826_112741",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

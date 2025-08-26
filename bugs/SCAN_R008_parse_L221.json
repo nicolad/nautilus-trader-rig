@@ -1,0 +1,20 @@
+{
+  "adapter_name": "parse",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R008_parse_L221",
+  "code_sample": "            timestamp: chrono::Utc.with_ymd_and_hms(2024, 1, 1, 12, 0, 0).unwrap(),",
+  "description": "ErrorHandling detected: unwrap()",
+  "file_location": {
+    "column": 74,
+    "line": 221,
+    "relative_path": "../crates/adapters/bitmex/src/common/parse.rs"
+  },
+  "fix_suggestion": "Review errorhandling pattern usage",
+  "pattern_id": "R008",
+  "severity": "High",
+  "timestamp": "20250826_112739",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

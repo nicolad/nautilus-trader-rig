@@ -1,0 +1,20 @@
+{
+  "adapter_name": "core",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R121_core_L199",
+  "code_sample": "                                .insert(result.to_string(), event_type.clone());",
+  "description": "Performance detected: clone()",
+  "file_location": {
+    "column": 71,
+    "line": 199,
+    "relative_path": "../crates/adapters/blockchain/src/rpc/core.rs"
+  },
+  "fix_suggestion": "Review performance pattern usage",
+  "pattern_id": "R121",
+  "severity": "High",
+  "timestamp": "20250826_112743",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

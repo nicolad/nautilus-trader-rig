@@ -1,0 +1,20 @@
+{
+  "adapter_name": "urls",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R122_urls_L37",
+  "code_sample": "    get_env_var(\"OKX_BASE_URL_HTTP\").unwrap_or_else(|_| \"https://www.okx.com\".to_string())",
+  "description": "Performance detected: literal.to_string()",
+  "file_location": {
+    "column": 57,
+    "line": 37,
+    "relative_path": "../crates/adapters/okx/src/common/urls.rs"
+  },
+  "fix_suggestion": "Review performance pattern usage",
+  "pattern_id": "R122",
+  "severity": "High",
+  "timestamp": "20250826_112737",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "adapter_name": "parse",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R009_parse_L1373",
+  "code_sample": "            .expect(\"Test data must have an order\")",
+  "description": "ErrorHandling detected: expect()",
+  "file_location": {
+    "column": 13,
+    "line": 1373,
+    "relative_path": "../crates/adapters/okx/src/common/parse.rs"
+  },
+  "fix_suggestion": "Review errorhandling pattern usage",
+  "pattern_id": "R009",
+  "severity": "High",
+  "timestamp": "20250826_112737",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

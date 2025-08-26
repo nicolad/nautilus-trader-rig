@@ -1,0 +1,20 @@
+{
+  "adapter_name": "http",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R128_http_L65",
+  "code_sample": "        let mut headers = HashMap::new();",
+  "description": "Performance detected: HashMap::new() no capacity",
+  "file_location": {
+    "column": 27,
+    "line": 65,
+    "relative_path": "../crates/adapters/blockchain/src/rpc/http.rs"
+  },
+  "fix_suggestion": "Review performance pattern usage",
+  "pattern_id": "R128",
+  "severity": "High",
+  "timestamp": "20250826_112743",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

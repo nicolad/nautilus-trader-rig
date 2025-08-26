@@ -1,0 +1,20 @@
+{
+  "adapter_name": "example_http",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R122_example_http_L49",
+  "code_sample": "        .instrument_type(Some(vec![\"perpetual\".to_string()]))",
+  "description": "Performance detected: literal.to_string()",
+  "file_location": {
+    "column": 36,
+    "line": 49,
+    "relative_path": "../crates/adapters/tardis/bin/example_http.rs"
+  },
+  "fix_suggestion": "Review performance pattern usage",
+  "pattern_id": "R122",
+  "severity": "High",
+  "timestamp": "20250826_112744",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "adapter_name": "enums",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R130_enums_L330",
+  "code_sample": "            .collect::<Vec<_>>()",
+  "description": "Performance detected: collect::<Vec<_>>()",
+  "file_location": {
+    "column": 13,
+    "line": 330,
+    "relative_path": "../crates/adapters/bitmex/src/common/enums.rs"
+  },
+  "fix_suggestion": "Review performance pattern usage",
+  "pattern_id": "R130",
+  "severity": "High",
+  "timestamp": "20250826_112739",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

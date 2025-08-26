@@ -1,0 +1,20 @@
+{
+  "adapter_name": "enums",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R008_enums_L645",
+  "code_sample": "            serde_json::to_string(&BitmexProductType::Specific(\"XBTUSD\".to_string())).unwrap(),",
+  "description": "ErrorHandling detected: unwrap()",
+  "file_location": {
+    "column": 86,
+    "line": 645,
+    "relative_path": "../crates/adapters/bitmex/src/common/enums.rs"
+  },
+  "fix_suggestion": "Review errorhandling pattern usage",
+  "pattern_id": "R008",
+  "severity": "High",
+  "timestamp": "20250826_112739",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

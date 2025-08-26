@@ -1,0 +1,20 @@
+{
+  "adapter_name": "replay",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R009_replay_L135",
+  "code_sample": "        .unwrap_or_else(|| std::env::current_dir().expect(\"Failed to get current directory\"));",
+  "description": "ErrorHandling detected: expect()",
+  "file_location": {
+    "column": 51,
+    "line": 135,
+    "relative_path": "../crates/adapters/tardis/src/replay.rs"
+  },
+  "fix_suggestion": "Review errorhandling pattern usage",
+  "pattern_id": "R009",
+  "severity": "High",
+  "timestamp": "20250826_112746",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

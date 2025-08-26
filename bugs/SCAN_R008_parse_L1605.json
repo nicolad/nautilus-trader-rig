@@ -1,0 +1,20 @@
+{
+  "adapter_name": "parse",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R008_parse_L1605",
+  "code_sample": "        let result: Option<String> = serde_json::from_str(json_with_empty).unwrap();",
+  "description": "ErrorHandling detected: unwrap()",
+  "file_location": {
+    "column": 75,
+    "line": 1605,
+    "relative_path": "../crates/adapters/okx/src/common/parse.rs"
+  },
+  "fix_suggestion": "Review errorhandling pattern usage",
+  "pattern_id": "R008",
+  "severity": "High",
+  "timestamp": "20250826_112737",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

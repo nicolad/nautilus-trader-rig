@@ -1,0 +1,20 @@
+{
+  "adapter_name": "http",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R101_http_L21",
+  "code_sample": "use pyo3::prelude::*;",
+  "description": "Style detected: glob import",
+  "file_location": {
+    "column": 1,
+    "line": 21,
+    "relative_path": "../crates/adapters/tardis/src/python/http.rs"
+  },
+  "fix_suggestion": "Review style pattern usage",
+  "pattern_id": "R101",
+  "severity": "High",
+  "timestamp": "20250826_112744",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

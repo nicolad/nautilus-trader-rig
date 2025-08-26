@@ -1,0 +1,20 @@
+{
+  "adapter_name": "stream",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R127_stream_L1653",
+  "code_sample": "                row1_parts.push(String::new());",
+  "description": "Performance detected: String::new() no capacity",
+  "file_location": {
+    "column": 33,
+    "line": 1653,
+    "relative_path": "../crates/adapters/tardis/src/csv/stream.rs"
+  },
+  "fix_suggestion": "Review performance pattern usage",
+  "pattern_id": "R127",
+  "severity": "High",
+  "timestamp": "20250826_112745",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

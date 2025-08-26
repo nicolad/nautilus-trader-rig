@@ -1,0 +1,20 @@
+{
+  "adapter_name": "client",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R067_client_L271",
+  "code_sample": "                                    let clock = get_atomic_clock_realtime(); // TODO: Optimize",
+  "description": "Style detected: TODO comment",
+  "file_location": {
+    "column": 81,
+    "line": 271,
+    "relative_path": "../crates/adapters/coinbase_intx/src/fix/client.rs"
+  },
+  "fix_suggestion": "Review style pattern usage",
+  "pattern_id": "R067",
+  "severity": "High",
+  "timestamp": "20250826_112741",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

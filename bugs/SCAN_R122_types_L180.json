@@ -1,0 +1,20 @@
+{
+  "adapter_name": "types",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R122_types_L180",
+  "code_sample": "                .map_or_else(|| \"None\".to_string(), |p| format!(\"{p}\")),",
+  "description": "Performance detected: literal.to_string()",
+  "file_location": {
+    "column": 33,
+    "line": 180,
+    "relative_path": "../crates/adapters/databento/src/python/types.rs"
+  },
+  "fix_suggestion": "Review performance pattern usage",
+  "pattern_id": "R122",
+  "severity": "High",
+  "timestamp": "20250826_112746",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

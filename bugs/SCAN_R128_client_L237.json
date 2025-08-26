@@ -1,0 +1,20 @@
+{
+  "adapter_name": "client",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R128_client_L237",
+  "code_sample": "        let mut headers = HashMap::new();",
+  "description": "Performance detected: HashMap::new() no capacity",
+  "file_location": {
+    "column": 27,
+    "line": 237,
+    "relative_path": "../crates/adapters/okx/src/http/client.rs"
+  },
+  "fix_suggestion": "Review performance pattern usage",
+  "pattern_id": "R128",
+  "severity": "High",
+  "timestamp": "20250826_112737",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

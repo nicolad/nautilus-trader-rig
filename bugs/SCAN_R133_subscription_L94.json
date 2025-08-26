@@ -1,0 +1,20 @@
+{
+  "adapter_name": "subscription",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R133_subscription_L94",
+  "code_sample": "        self.pool_mint_event_encoded.get(dex).cloned()",
+  "description": "Performance detected: cloned()",
+  "file_location": {
+    "column": 46,
+    "line": 94,
+    "relative_path": "../crates/adapters/blockchain/src/data/subscription.rs"
+  },
+  "fix_suggestion": "Review performance pattern usage",
+  "pattern_id": "R133",
+  "severity": "High",
+  "timestamp": "20250826_112744",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

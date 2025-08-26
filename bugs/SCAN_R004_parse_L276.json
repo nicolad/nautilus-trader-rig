@@ -1,0 +1,20 @@
+{
+  "adapter_name": "parse",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R004_parse_L276",
+  "code_sample": "        assert!(hist.u_time > 0);",
+  "description": "Panic detected: assert!",
+  "file_location": {
+    "column": 9,
+    "line": 276,
+    "relative_path": "../crates/adapters/okx/src/http/parse.rs"
+  },
+  "fix_suggestion": "Review panic pattern usage",
+  "pattern_id": "R004",
+  "severity": "High",
+  "timestamp": "20250826_090058",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

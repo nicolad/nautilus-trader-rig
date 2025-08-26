@@ -1,0 +1,20 @@
+{
+  "adapter_name": "symbology",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R008_symbology_L257",
+  "code_sample": "            result.err().unwrap().to_string(),",
+  "description": "ErrorHandling detected: unwrap()",
+  "file_location": {
+    "column": 25,
+    "line": 257,
+    "relative_path": "../crates/adapters/databento/src/symbology.rs"
+  },
+  "fix_suggestion": "Review errorhandling pattern usage",
+  "pattern_id": "R008",
+  "severity": "High",
+  "timestamp": "20250826_112746",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

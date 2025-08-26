@@ -1,0 +1,20 @@
+{
+  "adapter_name": "enums",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R001_enums_L172",
+  "code_sample": "            _ => panic!(\"Invalid `OrderStatus`\"),",
+  "description": "Panic detected: panic!",
+  "file_location": {
+    "column": 18,
+    "line": 172,
+    "relative_path": "../crates/adapters/okx/src/common/enums.rs"
+  },
+  "fix_suggestion": "Review panic pattern usage",
+  "pattern_id": "R001",
+  "severity": "Critical",
+  "timestamp": "20250826_112736",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

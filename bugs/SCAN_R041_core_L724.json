@@ -1,0 +1,20 @@
+{
+  "adapter_name": "core",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R041_core_L724",
+  "code_sample": "                metrics.update(blocks_processed as usize);",
+  "description": "Casting detected: as numeric cast",
+  "file_location": {
+    "column": 49,
+    "line": 724,
+    "relative_path": "../crates/adapters/blockchain/src/data/core.rs"
+  },
+  "fix_suggestion": "Review casting pattern usage",
+  "pattern_id": "R041",
+  "severity": "High",
+  "timestamp": "20250826_112743",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

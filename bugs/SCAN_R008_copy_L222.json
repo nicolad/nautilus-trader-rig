@@ -1,0 +1,20 @@
+{
+  "adapter_name": "copy",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R008_copy_L222",
+  "code_sample": "            row_data.write_all(&(-1i32).to_be_bytes()).unwrap(); // NULL value",
+  "description": "ErrorHandling detected: unwrap()",
+  "file_location": {
+    "column": 55,
+    "line": 222,
+    "relative_path": "../crates/adapters/blockchain/src/cache/copy.rs"
+  },
+  "fix_suggestion": "Review errorhandling pattern usage",
+  "pattern_id": "R008",
+  "severity": "High",
+  "timestamp": "20250826_112741",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

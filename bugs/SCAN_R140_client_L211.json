@@ -1,0 +1,20 @@
+{
+  "adapter_name": "client",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R140_client_L211",
+  "code_sample": "                    body: String::from_utf8_lossy(&resp.body).to_string(),",
+  "description": "Performance detected: from_utf8_lossy",
+  "file_location": {
+    "column": 35,
+    "line": 211,
+    "relative_path": "../crates/adapters/bitmex/src/http/client.rs"
+  },
+  "fix_suggestion": "Review performance pattern usage",
+  "pattern_id": "R140",
+  "severity": "High",
+  "timestamp": "20250826_112739",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

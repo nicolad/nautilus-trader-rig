@@ -1,0 +1,20 @@
+{
+  "adapter_name": "parse",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R008_parse_L1428",
+  "code_sample": "            parse_trade_tick(okx_trade, instrument_id, 2, 8, UnixNanos::default()).unwrap();",
+  "description": "ErrorHandling detected: unwrap()",
+  "file_location": {
+    "column": 83,
+    "line": 1428,
+    "relative_path": "../crates/adapters/okx/src/common/parse.rs"
+  },
+  "fix_suggestion": "Review errorhandling pattern usage",
+  "pattern_id": "R008",
+  "severity": "High",
+  "timestamp": "20250826_112737",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "adapter_name": "historical",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R111_historical_L106",
+  "code_sample": "        let file_content = fs::read_to_string(publishers_filepath)?;",
+  "description": "Async detected: blocking read_to_string in async",
+  "file_location": {
+    "column": 32,
+    "line": 106,
+    "relative_path": "../crates/adapters/databento/src/historical.rs"
+  },
+  "fix_suggestion": "Review async pattern usage",
+  "pattern_id": "R111",
+  "severity": "High",
+  "timestamp": "20250826_112746",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

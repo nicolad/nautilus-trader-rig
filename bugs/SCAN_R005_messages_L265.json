@@ -1,0 +1,20 @@
+{
+  "adapter_name": "messages",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R005_messages_L265",
+  "code_sample": "        assert_eq!(parsed.quote_asset_name, \"USDC\");",
+  "description": "Panic detected: assert_eq!",
+  "file_location": {
+    "column": 9,
+    "line": 265,
+    "relative_path": "../crates/adapters/coinbase_intx/src/websocket/messages.rs"
+  },
+  "fix_suggestion": "Review panic pattern usage",
+  "pattern_id": "R005",
+  "severity": "High",
+  "timestamp": "20250826_090101",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

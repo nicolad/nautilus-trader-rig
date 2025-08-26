@@ -1,0 +1,20 @@
+{
+  "adapter_name": "stream_deltas_bench",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R008_stream_deltas_bench_L67",
+  "code_sample": "    let count: usize = stream.map(|chunk| chunk.unwrap().len()).sum();",
+  "description": "ErrorHandling detected: unwrap()",
+  "file_location": {
+    "column": 48,
+    "line": 67,
+    "relative_path": "../crates/adapters/tardis/bin/stream_deltas_bench.rs"
+  },
+  "fix_suggestion": "Review errorhandling pattern usage",
+  "pattern_id": "R008",
+  "severity": "High",
+  "timestamp": "20250826_112744",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

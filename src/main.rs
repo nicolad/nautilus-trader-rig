@@ -4,20 +4,107 @@
 
 use anyhow::Result;
 use std::time::Duration;
+use std::fs;
 use tracing::{debug, error, info, trace, warn};
 
 mod config;
 mod deepseek;
+mod false_positive_filter;
 mod fastembed;
 mod logging;
 mod mcp;
 mod vector_store;
+pub mod scanner;
+pub mod patterns;
 
 use config::Config;
 use deepseek::DeepSeekClient;
 use logging::{init_dev_logging, log_directory_op, log_file_processing, log_status};
 use mcp::run_mcp_server;
 use vector_store::VectorStoreManager;
+use scanner::scan;
+use crate::false_positive_filter::{FalsePositiveFilter, ValidationResult, SuggestedAction, ValidatedIssue};
+use walkdir;
+
+/// Scan adapter directories for pattern matches
+async fn scan_adapter_directories() -> Result<()> {
+    info!("🔍 Scanning adapter directories for pattern matches...");
+    
+    let adapter_dirs = [
+        Config::ADAPTERS_DIRECTORY,
+        Config::CORE_ADAPTERS_DIRECTORY,
+    ];
+    
+    let mut total_issues = 0;
+    
+    for dir_path in &adapter_dirs {
+        let full_path = Config::manifest_dir().join(dir_path);
+        if !full_path.exists() {
+            warn!("Adapter directory not found: {}", full_path.display());
+            continue;
+        }
+        
+        info!("Scanning directory: {}", full_path.display());
+        
+        for entry in walkdir::WalkDir::new(&full_path)
+            .follow_links(true)
+            .into_iter()
+            .filter_map(|e| e.ok())
+        {
+            let path = entry.path();
+            if let Some(ext) = path.extension() {
+                if Config::RUST_FILE_EXTENSIONS.contains(&ext.to_str().unwrap_or("")) {
+                    if let Ok(content) = fs::read_to_string(path) {
+                        let issues = scan(&content);
+                        if !issues.is_empty() {
+                            let relative_path = pathdiff::diff_paths(path, Config::manifest_dir())
+                                .unwrap_or_else(|| path.to_path_buf());
+                            
+                            info!("Found {} issues in: {}", issues.len(), relative_path.display());
+                            total_issues += issues.len();
+                            
+                            // Store each issue as a bug report
+                            for issue in issues {
+                                let bug_data = serde_json::json!({
+                                    "bug_id": format!("SCAN_{}_{}_L{}", issue.pattern_id, 
+                                        relative_path.file_stem().unwrap_or_default().to_str().unwrap_or("unknown"), 
+                                        issue.line),
+                                    "adapter_name": relative_path.file_stem().unwrap_or_default().to_str().unwrap_or("unknown"),
+                                    "analysis_context": "Automated pattern detection",
+                                    "description": format!("{} detected: {}", issue.category, issue.name),
+                                    "severity": issue.severity,
+                                    "file_location": {
+                                        "relative_path": relative_path.to_str().unwrap_or(""),
+                                        "line": issue.line,
+                                        "column": issue.col
+                                    },
+                                    "code_sample": issue.excerpt,
+                                    "pattern_id": issue.pattern_id,
+                                    "fix_suggestion": format!("Review {} pattern usage", issue.category.to_lowercase()),
+                                    "timestamp": chrono::Utc::now().format("%Y%m%d_%H%M%S").to_string(),
+                                    "workspace_info": {
+                                        "repository": "nautilus_trader",
+                                        "branch": "develop"
+                                    }
+                                });
+                                
+                                // Store bug report
+                                let bug_id = bug_data["bug_id"].as_str().unwrap_or("unknown");
+                                let bugs_dir = Config::manifest_dir().join(Config::BUGS_DIRECTORY);
+                                fs::create_dir_all(&bugs_dir)?;
+                                let bug_file = bugs_dir.join(format!("{}.json", bug_id));
+                                fs::write(&bug_file, serde_json::to_string_pretty(&bug_data)?)?;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    info!("✅ Pattern scanning complete. Total issues found: {}", total_issues);
+    Ok(())
+}
 
 pub struct UnifiedServerState {
     pub vector_store: Option<VectorStoreManager>,
@@ -315,6 +402,62 @@ async fn analyze_adapter_files_for_bugs(state: &UnifiedServerState) -> Result<()
 
         files_analyzed += 1;
 
+        // First run pattern-based scanning
+        println!("   🔍 Running pattern-based analysis...");
+        let pattern_results = crate::scanner::scan(&content);
+        
+        // Initialize false positive filter
+        let mut fp_filter = FalsePositiveFilter::new(state.deepseek_client.clone());
+        let mut validated_issues = Vec::new();
+        let mut real_issues = 0;
+        
+        if !pattern_results.is_empty() {
+            println!("   🔍 Validating {} pattern matches for false positives...", pattern_results.len());
+            
+            for issue in pattern_results {
+                match fp_filter.validate_issue(&issue, &content).await {
+                    Ok(validation) => {
+                        let validated_issue = ValidatedIssue::new(issue, validation);
+                        
+                        if validated_issue.is_valid {
+                            real_issues += 1;
+                            debug!("Real issue: {} - {} (confidence: {:.2})", 
+                                   validated_issue.issue.pattern_id, 
+                                   validated_issue.issue.name,
+                                   validated_issue.confidence);
+                        } else {
+                            debug!("False positive filtered: {} - {} (reason: {})", 
+                                   validated_issue.issue.pattern_id, 
+                                   validated_issue.issue.name,
+                                   validated_issue.ai_reasoning);
+                        }
+                        
+                        validated_issues.push(validated_issue);
+                    }
+                    Err(e) => {
+                        warn!("Failed to validate issue: {}", e);
+                        // Include unvalidated issue with conservative approach
+                        let validation = ValidationResult {
+                            is_false_positive: false,
+                            confidence: 0.5,
+                            reasoning: format!("Validation failed: {}", e),
+                            suggested_action: SuggestedAction::Review,
+                        };
+                        validated_issues.push(ValidatedIssue::new(issue, validation));
+                        real_issues += 1;
+                    }
+                }
+            }
+            
+            let (total_validations, false_positives) = fp_filter.get_validation_stats();
+            println!("   📊 Validation results: {} real issues, {} false positives filtered", 
+                     real_issues, validated_issues.len() - real_issues);
+            debug!("False positive filter stats: {}/{} total validations, {} false positives", 
+                   false_positives, total_validations, false_positives);
+        } else {
+            println!("   ✅ No pattern-based issues detected");
+        }
+
         // Get file metadata for enhanced reporting
         let file_metadata = match tokio::fs::metadata(file_path).await {
             Ok(metadata) => Some(serde_json::json!({
@@ -323,7 +466,22 @@ async fn analyze_adapter_files_for_bugs(state: &UnifiedServerState) -> Result<()
                 "last_modified": metadata.modified()
                     .ok()
                     .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-                    .map(|d| d.as_secs())
+                    .map(|d| d.as_secs()),
+                "total_pattern_matches": validated_issues.len(),
+                "real_issues_found": real_issues,
+                "false_positives_filtered": validated_issues.len() - real_issues,
+                "validated_issues": validated_issues.iter().map(|vi| serde_json::json!({
+                    "pattern_id": vi.issue.pattern_id,
+                    "severity": vi.issue.severity,
+                    "category": vi.issue.category,
+                    "name": vi.issue.name,
+                    "line": vi.issue.line,
+                    "excerpt": vi.issue.excerpt,
+                    "is_false_positive": !vi.is_valid,
+                    "confidence": vi.confidence,
+                    "is_valid": vi.is_valid,
+                    "reasoning": vi.ai_reasoning
+                })).collect::<Vec<_>>()
             })),
             Err(_) => None,
         };
@@ -364,16 +522,56 @@ async fn analyze_adapter_files_for_bugs(state: &UnifiedServerState) -> Result<()
                         analysis_result.len()
                     );
 
-                    // Check if bug was found
-                    if analysis_result.contains("BUG_FOUND: yes") {
+                    // Check if bug was found (DeepSeek or validated pattern-based)
+                    let deepseek_bug_found = analysis_result.contains("BUG_FOUND: yes");
+                    let real_pattern_bugs = validated_issues.iter().filter(|vi| vi.is_valid).count() > 0;
+                    
+                    if deepseek_bug_found || real_pattern_bugs {
                         bugs_found += 1;
                         println!("   🐛 Bug detected! Storing analysis...");
 
                         // Extract bug details with enhanced parsing
-                        let severity = extract_field(&analysis_result, "SEVERITY")
-                            .unwrap_or("MEDIUM".to_string());
-                        let description = extract_field(&analysis_result, "DESCRIPTION")
-                            .unwrap_or("Bug detected by automated analysis".to_string());
+                        let severity = if real_pattern_bugs {
+                            // Use highest severity from real (non-false-positive) pattern results
+                            validated_issues.iter()
+                                .filter(|vi| vi.is_valid)
+                                .map(|vi| vi.issue.severity.clone())
+                                .max_by_key(|s| match s.as_str() {
+                                    "Critical" => 4,
+                                    "High" => 3,
+                                    "Medium" => 2,
+                                    "Low" => 1,
+                                    _ => 0,
+                                })
+                                .unwrap_or("MEDIUM".to_string())
+                                .to_string()
+                        } else {
+                            extract_field(&analysis_result, "SEVERITY")
+                                .unwrap_or("MEDIUM".to_string())
+                        };
+                        
+                        let description = if real_pattern_bugs {
+                            let pattern_desc = validated_issues.iter()
+                                .filter(|vi| vi.is_valid)
+                                .map(|vi| format!("[{}] {} (confidence: {:.2})", 
+                                         vi.issue.pattern_id, 
+                                         vi.issue.name,
+                                         vi.confidence))
+                                .collect::<Vec<_>>()
+                                .join("; ");
+                            if deepseek_bug_found {
+                                format!("Validated Pattern Issues: {}; DeepSeek: {}", 
+                                       pattern_desc,
+                                       extract_field(&analysis_result, "DESCRIPTION")
+                                           .unwrap_or("Additional issues detected".to_string()))
+                            } else {
+                                format!("Validated Pattern Issues: {}", pattern_desc)
+                            }
+                        } else {
+                            extract_field(&analysis_result, "DESCRIPTION")
+                                .unwrap_or("Bug detected by automated analysis".to_string())
+                        };
+                        
                         let code_sample = extract_field(&analysis_result, "CODE_SAMPLE")
                             .unwrap_or("See file content".to_string());
                         let fix_suggestion = extract_field(&analysis_result, "FIX_SUGGESTION")
@@ -459,15 +657,97 @@ async fn analyze_adapter_files_for_bugs(state: &UnifiedServerState) -> Result<()
                 }
             }
         } else {
-            println!("   ⚠️ DeepSeek client not available");
-            warn!("Skipping analysis - DeepSeek client not initialized");
-            
-            analysis_results.push(serde_json::json!({
-                "file_path": file_path,
-                "status": "skipped_no_client",
-                "file_metadata": file_metadata,
-                "timestamp": chrono::Utc::now().to_rfc3339()
-            }));
+            // Even without DeepSeek, check for validated pattern-based issues
+            let real_issues_count = validated_issues.iter().filter(|vi| vi.is_valid).count();
+            if real_issues_count > 0 {
+                bugs_found += 1;
+                println!("   🐛 Validated pattern-based bugs detected! Storing analysis...");
+
+                // Use validated pattern-based bug information
+                let severity = validated_issues.iter()
+                    .filter(|vi| vi.is_valid)
+                    .map(|vi| vi.issue.severity.clone())
+                    .max_by_key(|s| match s.as_str() {
+                        "Critical" => 4,
+                        "High" => 3,
+                        "Medium" => 2,
+                        "Low" => 1,
+                        _ => 0,
+                    })
+                    .unwrap_or("MEDIUM".to_string())
+                    .to_string();
+                
+                let description = validated_issues.iter()
+                    .filter(|vi| vi.is_valid)
+                    .map(|vi| format!("[{}] {} (confidence: {:.2})", 
+                             vi.issue.pattern_id, 
+                             vi.issue.name,
+                             vi.confidence))
+                    .collect::<Vec<_>>()
+                    .join("; ");
+
+                // Generate bug ID
+                let file_name = std::path::Path::new(file_path)
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("unknown");
+                let bug_id = format!(
+                    "PATTERN_BUG_{}_{}_{}",
+                    file_name,
+                    bugs_found,
+                    chrono::Utc::now().format("%H%M%S")
+                );
+
+                // Store pattern-based bug
+                match store_bug_internal(
+                    &bug_id,
+                    &severity,
+                    &description,
+                    Some(file_name.to_string()),
+                    "Pattern-based detection",
+                    "Review code patterns and apply fixes as needed",
+                    Some(file_path.to_string()),
+                )
+                .await
+                {
+                    Ok(filename) => {
+                        println!("   ✅ Pattern bug stored: {}", filename);
+                        info!("Pattern bug {} stored successfully: {}", bug_id, filename);
+                        
+                        analysis_results.push(serde_json::json!({
+                            "file_path": file_path,
+                            "status": "pattern_bug_found",
+                            "bug_id": bug_id,
+                            "severity": severity,
+                            "bug_file": filename,
+                            "file_metadata": file_metadata,
+                            "timestamp": chrono::Utc::now().to_rfc3339()
+                        }));
+                    }
+                    Err(e) => {
+                        println!("   ❌ Failed to store pattern bug: {}", e);
+                        error!("Failed to store pattern bug {}: {}", bug_id, e);
+                        
+                        analysis_results.push(serde_json::json!({
+                            "file_path": file_path,
+                            "status": "pattern_bug_found_but_storage_failed",
+                            "bug_id": bug_id,
+                            "storage_error": format!("{}", e),
+                            "timestamp": chrono::Utc::now().to_rfc3339()
+                        }));
+                    }
+                }
+            } else {
+                println!("   ⚠️ DeepSeek client not available, no pattern issues found");
+                warn!("Skipping analysis - DeepSeek client not initialized and no pattern issues");
+                
+                analysis_results.push(serde_json::json!({
+                    "file_path": file_path,
+                    "status": "skipped_no_client_no_patterns",
+                    "file_metadata": file_metadata,
+                    "timestamp": chrono::Utc::now().to_rfc3339()
+                }));
+            }
         }
 
         // Add small delay to avoid rate limiting
@@ -564,58 +844,20 @@ async fn store_bug_internal(
     let bugs_dir = config::Config::bugs_directory_path();
     let filename = bugs_dir.join(format!("{}{}_{}.json", bug_id, adapter_suffix, timestamp));
 
-    // Enhanced file location information
-    let mut file_details = serde_json::Map::new();
-    if let Some(path) = &file_path {
-        file_details.insert("absolute_path".to_string(), serde_json::Value::String(path.clone()));
-        
-        // Extract relative path from workspace root
+    // Extract relative path from workspace root
+    let file_location = if let Some(path) = &file_path {
         if let Ok(workspace_root) = std::env::current_dir() {
             if let Ok(relative_path) = std::path::Path::new(path).strip_prefix(&workspace_root) {
-                file_details.insert("relative_path".to_string(), 
-                    serde_json::Value::String(relative_path.display().to_string()));
+                relative_path.display().to_string()
+            } else {
+                path.clone()
             }
+        } else {
+            path.clone()
         }
-        
-        // Extract filename and directory information
-        let path_obj = std::path::Path::new(path);
-        if let Some(filename) = path_obj.file_name() {
-            file_details.insert("filename".to_string(), 
-                serde_json::Value::String(filename.to_string_lossy().to_string()));
-        }
-        if let Some(parent) = path_obj.parent() {
-            file_details.insert("directory".to_string(), 
-                serde_json::Value::String(parent.display().to_string()));
-        }
-        
-        // Check if file exists and get metadata
-        if let Ok(metadata) = tokio::fs::metadata(path).await {
-            file_details.insert("file_size_bytes".to_string(), 
-                serde_json::Value::Number(serde_json::Number::from(metadata.len())));
-            if let Ok(modified) = metadata.modified() {
-                if let Ok(duration) = modified.duration_since(std::time::UNIX_EPOCH) {
-                    file_details.insert("last_modified_timestamp".to_string(), 
-                        serde_json::Value::Number(serde_json::Number::from(duration.as_secs())));
-                }
-            }
-        }
-    }
-
-    // Try to extract line numbers from code sample if available
-    let mut location_details = serde_json::Map::new();
-    if !code_sample.is_empty() && file_path.is_some() {
-        if let Some(path) = &file_path {
-            if let Ok(file_content) = tokio::fs::read_to_string(path).await {
-                // Find the approximate line number where the code sample appears
-                if let Some(line_number) = find_code_in_file(&file_content, code_sample) {
-                    location_details.insert("approximate_line_number".to_string(), 
-                        serde_json::Value::Number(serde_json::Number::from(line_number)));
-                    location_details.insert("context_extraction_method".to_string(), 
-                        serde_json::Value::String("fuzzy_string_match".to_string()));
-                }
-            }
-        }
-    }
+    } else {
+        "unknown".to_string()
+    };
 
     let bug_data = serde_json::json!({
         "bug_id": bug_id,
@@ -626,10 +868,7 @@ async fn store_bug_internal(
         "fix_suggestion": fix_suggestion,
         "timestamp": timestamp,
         "analysis_context": "Automated detection via Nautilus Trader Rig",
-        "file_location": {
-            "details": file_details,
-            "source_location": location_details
-        },
+        "relative_path": file_location,
         "workspace_info": {
             "repository": "nautilus_trader",
             "branch": get_git_branch().await.unwrap_or_else(|| "unknown".to_string()),
@@ -814,6 +1053,11 @@ async fn main() -> Result<()> {
 
     // Initialize centralized logging system
     init_dev_logging()?;
+
+    // Automatically scan adapter directories for pattern matches
+    if let Err(e) = scan_adapter_directories().await {
+        error!("Failed to scan adapter directories: {}", e);
+    }
 
     // Log environment file status
     debug!("Environment file path: {}", Config::ENV_FILE_PATH);

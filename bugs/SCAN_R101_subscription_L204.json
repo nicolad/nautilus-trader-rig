@@ -1,0 +1,20 @@
+{
+  "adapter_name": "subscription",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R101_subscription_L204",
+  "code_sample": "    use super::*;",
+  "description": "Style detected: glob import",
+  "file_location": {
+    "column": 5,
+    "line": 204,
+    "relative_path": "../crates/adapters/blockchain/src/data/subscription.rs"
+  },
+  "fix_suggestion": "Review style pattern usage",
+  "pattern_id": "R101",
+  "severity": "High",
+  "timestamp": "20250826_112744",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

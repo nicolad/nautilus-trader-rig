@@ -1,0 +1,20 @@
+{
+  "adapter_name": "message",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R122_message_L261",
+  "code_sample": "            Some(\"282a0445-0e3a-abeb-f403-11003204ea1b\".to_string())",
+  "description": "Performance detected: literal.to_string()",
+  "file_location": {
+    "column": 18,
+    "line": 261,
+    "relative_path": "../crates/adapters/tardis/src/machine/message.rs"
+  },
+  "fix_suggestion": "Review performance pattern usage",
+  "pattern_id": "R122",
+  "severity": "High",
+  "timestamp": "20250826_112745",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

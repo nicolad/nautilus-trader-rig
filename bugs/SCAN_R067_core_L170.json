@@ -1,0 +1,20 @@
+{
+  "adapter_name": "core",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R067_core_L170",
+  "code_sample": "        // TODO disable block syncing for now as we don't have timestamps yet configured",
+  "description": "Style detected: TODO comment",
+  "file_location": {
+    "column": 12,
+    "line": 170,
+    "relative_path": "../crates/adapters/blockchain/src/data/core.rs"
+  },
+  "fix_suggestion": "Review style pattern usage",
+  "pattern_id": "R067",
+  "severity": "High",
+  "timestamp": "20250826_112743",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

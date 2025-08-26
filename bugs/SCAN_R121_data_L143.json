@@ -1,0 +1,20 @@
+{
+  "adapter_name": "data",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R121_data_L143",
+  "code_sample": "        let loader = DatabentoDataLoader::new(Some(config.publishers_filepath.clone()))?;",
+  "description": "Performance detected: clone()",
+  "file_location": {
+    "column": 78,
+    "line": 143,
+    "relative_path": "../crates/adapters/databento/src/data.rs"
+  },
+  "fix_suggestion": "Review performance pattern usage",
+  "pattern_id": "R121",
+  "severity": "High",
+  "timestamp": "20250826_112747",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

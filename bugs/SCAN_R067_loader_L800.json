@@ -1,0 +1,20 @@
+{
+  "adapter_name": "loader",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R067_loader_L800",
+  "code_sample": "        // assert_eq!(trades.len(), 2);  TODO: No records?",
+  "description": "Style detected: TODO comment",
+  "file_location": {
+    "column": 42,
+    "line": 800,
+    "relative_path": "../crates/adapters/databento/src/loader.rs"
+  },
+  "fix_suggestion": "Review style pattern usage",
+  "pattern_id": "R067",
+  "severity": "High",
+  "timestamp": "20250826_112747",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

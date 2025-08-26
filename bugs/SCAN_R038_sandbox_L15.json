@@ -1,0 +1,20 @@
+{
+  "adapter_name": "sandbox",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R038_sandbox_L15",
+  "code_sample": "        .key(env::var(\"DATABENTO_API_KEY\").unwrap())",
+  "description": "ErrorHandling detected: env::var(...).unwrap()",
+  "file_location": {
+    "column": 14,
+    "line": 15,
+    "relative_path": "../crates/adapters/databento/bin/sandbox.rs"
+  },
+  "fix_suggestion": "Review errorhandling pattern usage",
+  "pattern_id": "R038",
+  "severity": "High",
+  "timestamp": "20250826_112746",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

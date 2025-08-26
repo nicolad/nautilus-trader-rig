@@ -1,0 +1,20 @@
+{
+  "adapter_name": "client",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R008_client_L145",
+  "code_sample": "        Self::new(None, None, None, None, None, None).unwrap()",
+  "description": "ErrorHandling detected: unwrap()",
+  "file_location": {
+    "column": 54,
+    "line": 145,
+    "relative_path": "../crates/adapters/okx/src/websocket/client.rs"
+  },
+  "fix_suggestion": "Review errorhandling pattern usage",
+  "pattern_id": "R008",
+  "severity": "High",
+  "timestamp": "20250826_112735",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

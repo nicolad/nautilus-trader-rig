@@ -1,0 +1,20 @@
+{
+  "adapter_name": "load",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R067_load_L942",
+  "code_sample": "    // TODO: Flaky in CI, potentially from syncing large test data files from cache",
+  "description": "Style detected: TODO comment",
+  "file_location": {
+    "column": 8,
+    "line": 942,
+    "relative_path": "../crates/adapters/tardis/src/csv/load.rs"
+  },
+  "fix_suggestion": "Review style pattern usage",
+  "pattern_id": "R067",
+  "severity": "High",
+  "timestamp": "20250826_112745",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

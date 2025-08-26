@@ -1,0 +1,20 @@
+{
+  "adapter_name": "core",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R121_core_L85",
+  "code_sample": "            let wss_rpc_url = config.wss_rpc_url.clone().expect(\"wss_rpc_url is required\");",
+  "description": "Performance detected: clone()",
+  "file_location": {
+    "column": 49,
+    "line": 85,
+    "relative_path": "../crates/adapters/blockchain/src/data/core.rs"
+  },
+  "fix_suggestion": "Review performance pattern usage",
+  "pattern_id": "R121",
+  "severity": "High",
+  "timestamp": "20250826_112743",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

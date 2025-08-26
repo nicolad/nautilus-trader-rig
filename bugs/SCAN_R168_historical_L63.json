@@ -1,0 +1,20 @@
+{
+  "adapter_name": "historical",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R168_historical_L63",
+  "code_sample": "    inner: Arc<Mutex<databento::HistoricalClient>>,",
+  "description": "Performance detected: Arc<Mutex<_>>",
+  "file_location": {
+    "column": 12,
+    "line": 63,
+    "relative_path": "../crates/adapters/databento/src/historical.rs"
+  },
+  "fix_suggestion": "Review performance pattern usage",
+  "pattern_id": "R168",
+  "severity": "High",
+  "timestamp": "20250826_112746",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

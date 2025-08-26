@@ -1,0 +1,20 @@
+{
+  "adapter_name": "copy",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R116_copy_L185",
+  "code_sample": "                .write_all(&(base_fee_bytes.len() as i32).to_be_bytes())",
+  "description": "Casting detected: float->int as",
+  "file_location": {
+    "column": 51,
+    "line": 185,
+    "relative_path": "../crates/adapters/blockchain/src/cache/copy.rs"
+  },
+  "fix_suggestion": "Review casting pattern usage",
+  "pattern_id": "R116",
+  "severity": "High",
+  "timestamp": "20250826_112741",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

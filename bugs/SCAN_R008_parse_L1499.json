@@ -1,0 +1,20 @@
+{
+  "adapter_name": "parse",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R008_parse_L1499",
+  "code_sample": "        let bar = parse_candlestick(okx_candlestick, bar_type, 2, 8, UnixNanos::default()).unwrap();",
+  "description": "ErrorHandling detected: unwrap()",
+  "file_location": {
+    "column": 91,
+    "line": 1499,
+    "relative_path": "../crates/adapters/okx/src/common/parse.rs"
+  },
+  "fix_suggestion": "Review errorhandling pattern usage",
+  "pattern_id": "R008",
+  "severity": "High",
+  "timestamp": "20250826_112737",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

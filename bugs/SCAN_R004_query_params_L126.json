@@ -1,0 +1,20 @@
+{
+  "adapter_name": "query_params",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R004_query_params_L126",
+  "code_sample": "    assert!(qs.contains(expected));",
+  "description": "Panic detected: assert!",
+  "file_location": {
+    "column": 5,
+    "line": 126,
+    "relative_path": "../crates/adapters/okx/tests/query_params.rs"
+  },
+  "fix_suggestion": "Review panic pattern usage",
+  "pattern_id": "R004",
+  "severity": "High",
+  "timestamp": "20250826_090054",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

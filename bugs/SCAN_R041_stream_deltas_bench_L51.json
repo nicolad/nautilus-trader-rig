@@ -1,0 +1,20 @@
+{
+  "adapter_name": "stream_deltas_bench",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R041_stream_deltas_bench_L51",
+  "code_sample": "        count as f64 / duration.as_secs_f64()",
+  "description": "Casting detected: as numeric cast",
+  "file_location": {
+    "column": 15,
+    "line": 51,
+    "relative_path": "../crates/adapters/tardis/bin/stream_deltas_bench.rs"
+  },
+  "fix_suggestion": "Review casting pattern usage",
+  "pattern_id": "R041",
+  "severity": "High",
+  "timestamp": "20250826_112744",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

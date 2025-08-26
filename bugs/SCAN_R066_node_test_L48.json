@@ -1,0 +1,20 @@
+{
+  "adapter_name": "node_test",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R066_node_test_L48",
+  "code_sample": "        println!(\"⚠️  DATABENTO_API_KEY not found, using placeholder\");",
+  "description": "Style detected: println! left",
+  "file_location": {
+    "column": 9,
+    "line": 48,
+    "relative_path": "../crates/adapters/databento/bin/node_test.rs"
+  },
+  "fix_suggestion": "Review style pattern usage",
+  "pattern_id": "R066",
+  "severity": "High",
+  "timestamp": "20250826_112746",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

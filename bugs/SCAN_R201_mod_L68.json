@@ -1,0 +1,20 @@
+{
+  "adapter_name": "mod",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R201_mod_L68",
+  "code_sample": "            invalid_tokens: HashSet::new(),",
+  "description": "Performance detected: HashSet::new()",
+  "file_location": {
+    "column": 29,
+    "line": 68,
+    "relative_path": "../crates/adapters/blockchain/src/cache/mod.rs"
+  },
+  "fix_suggestion": "Review performance pattern usage",
+  "pattern_id": "R201",
+  "severity": "High",
+  "timestamp": "20250826_112742",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "adapter_name": "subscription",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R008_subscription_L342",
+  "code_sample": "        assert!(burn_sig.is_some() && burn_sig.unwrap().starts_with(\"0x\"));",
+  "description": "ErrorHandling detected: unwrap()",
+  "file_location": {
+    "column": 47,
+    "line": 342,
+    "relative_path": "../crates/adapters/blockchain/src/data/subscription.rs"
+  },
+  "fix_suggestion": "Review errorhandling pattern usage",
+  "pattern_id": "R008",
+  "severity": "High",
+  "timestamp": "20250826_112744",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

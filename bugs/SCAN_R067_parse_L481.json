@@ -1,0 +1,20 @@
+{
+  "adapter_name": "parse",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R067_parse_L481",
+  "code_sample": "    let ts_event = UnixNanos::from(candle.start); // TODO: Convert to close",
+  "description": "Style detected: TODO comment",
+  "file_location": {
+    "column": 54,
+    "line": 481,
+    "relative_path": "../crates/adapters/coinbase_intx/src/websocket/parse.rs"
+  },
+  "fix_suggestion": "Review style pattern usage",
+  "pattern_id": "R067",
+  "severity": "High",
+  "timestamp": "20250826_112740",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "adapter_name": "factories",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R049_factories_L308",
+  "code_sample": "        let api_key = \"test_key\".to_string();",
+  "description": "Security detected: hard-coded API key",
+  "file_location": {
+    "column": 13,
+    "line": 308,
+    "relative_path": "../crates/adapters/databento/src/factories.rs"
+  },
+  "fix_suggestion": "Review security pattern usage",
+  "pattern_id": "R049",
+  "severity": "Critical",
+  "timestamp": "20250826_112746",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

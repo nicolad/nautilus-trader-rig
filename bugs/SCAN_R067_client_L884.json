@@ -1,0 +1,20 @@
+{
+  "adapter_name": "client",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R067_client_L884",
+  "code_sample": "        // TODO: aggregated parameter is ignored, always uses 'trades' channel.",
+  "description": "Style detected: TODO comment",
+  "file_location": {
+    "column": 12,
+    "line": 884,
+    "relative_path": "../crates/adapters/okx/src/websocket/client.rs"
+  },
+  "fix_suggestion": "Review style pattern usage",
+  "pattern_id": "R067",
+  "severity": "High",
+  "timestamp": "20250826_112735",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

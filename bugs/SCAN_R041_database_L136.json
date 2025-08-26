@@ -1,0 +1,20 @@
+{
+  "adapter_name": "database",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R041_database_L136",
+  "code_sample": "        .bind(chain.chain_id as i32)",
+  "description": "Casting detected: as numeric cast",
+  "file_location": {
+    "column": 30,
+    "line": 136,
+    "relative_path": "../crates/adapters/blockchain/src/cache/database.rs"
+  },
+  "fix_suggestion": "Review casting pattern usage",
+  "pattern_id": "R041",
+  "severity": "High",
+  "timestamp": "20250826_112742",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

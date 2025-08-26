@@ -1,0 +1,20 @@
+{
+  "adapter_name": "data",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R116_data_L749",
+  "code_sample": "                    .map(|dt| dt.timestamp_nanos_opt().unwrap_or(0) as u64)",
+  "description": "Casting detected: float->int as",
+  "file_location": {
+    "column": 69,
+    "line": 749,
+    "relative_path": "../crates/adapters/databento/src/data.rs"
+  },
+  "fix_suggestion": "Review casting pattern usage",
+  "pattern_id": "R116",
+  "severity": "High",
+  "timestamp": "20250826_112747",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

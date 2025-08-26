@@ -1,0 +1,20 @@
+{
+  "adapter_name": "client",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R067_client_L891",
+  "code_sample": "                        break; // TODO: Break for now",
+  "description": "Style detected: TODO comment",
+  "file_location": {
+    "column": 35,
+    "line": 891,
+    "relative_path": "../crates/adapters/bitmex/src/websocket/client.rs"
+  },
+  "fix_suggestion": "Review style pattern usage",
+  "pattern_id": "R067",
+  "severity": "High",
+  "timestamp": "20250826_112738",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

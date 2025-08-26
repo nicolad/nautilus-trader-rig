@@ -1,0 +1,20 @@
+{
+  "adapter_name": "client",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R088_client_L898",
+  "code_sample": "                Err(_) => {} // Timeout occurred awaiting a message, continue loop to check signal",
+  "description": "ErrorHandling detected: Err(_) => {}",
+  "file_location": {
+    "column": 17,
+    "line": 898,
+    "relative_path": "../crates/adapters/bitmex/src/websocket/client.rs"
+  },
+  "fix_suggestion": "Review errorhandling pattern usage",
+  "pattern_id": "R088",
+  "severity": "High",
+  "timestamp": "20250826_112738",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

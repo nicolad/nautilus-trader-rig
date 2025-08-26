@@ -1,0 +1,20 @@
+{
+  "adapter_name": "client",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R116_client_L1164",
+  "code_sample": "                .limit(page_cap as u32);",
+  "description": "Casting detected: float->int as",
+  "file_location": {
+    "column": 33,
+    "line": 1164,
+    "relative_path": "../crates/adapters/okx/src/http/client.rs"
+  },
+  "fix_suggestion": "Review casting pattern usage",
+  "pattern_id": "R116",
+  "severity": "High",
+  "timestamp": "20250826_112737",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

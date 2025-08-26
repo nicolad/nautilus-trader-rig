@@ -1,0 +1,20 @@
+{
+  "adapter_name": "client",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R009_client_L109",
+  "code_sample": "            .expect(\"Failed to connect to WebSocket\");",
+  "description": "ErrorHandling detected: expect()",
+  "file_location": {
+    "column": 13,
+    "line": 109,
+    "relative_path": "../crates/adapters/tardis/src/machine/client.rs"
+  },
+  "fix_suggestion": "Review errorhandling pattern usage",
+  "pattern_id": "R009",
+  "severity": "High",
+  "timestamp": "20250826_112745",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

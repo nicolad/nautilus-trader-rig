@@ -1,0 +1,20 @@
+{
+  "adapter_name": "parse",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R122_parse_L1601",
+  "code_sample": "            cl_ord_id: \"test_order_1\".to_string(),",
+  "description": "Performance detected: literal.to_string()",
+  "file_location": {
+    "column": 24,
+    "line": 1601,
+    "relative_path": "../crates/adapters/okx/src/websocket/parse.rs"
+  },
+  "fix_suggestion": "Review performance pattern usage",
+  "pattern_id": "R122",
+  "severity": "High",
+  "timestamp": "20250826_112736",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "adapter_name": "core",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R067_core_L413",
+  "code_sample": "        // TODO add caching and persisting of swaps, resolve block timestamps sync",
+  "description": "Style detected: TODO comment",
+  "file_location": {
+    "column": 12,
+    "line": 413,
+    "relative_path": "../crates/adapters/blockchain/src/data/core.rs"
+  },
+  "fix_suggestion": "Review style pattern usage",
+  "pattern_id": "R067",
+  "severity": "High",
+  "timestamp": "20250826_112743",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

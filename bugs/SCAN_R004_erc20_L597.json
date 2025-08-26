@@ -1,0 +1,20 @@
+{
+  "adapter_name": "erc20",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R004_erc20_L597",
+  "code_sample": "        assert!(result.is_err());",
+  "description": "Panic detected: assert!",
+  "file_location": {
+    "column": 9,
+    "line": 597,
+    "relative_path": "../crates/adapters/blockchain/src/contracts/erc20.rs"
+  },
+  "fix_suggestion": "Review panic pattern usage",
+  "pattern_id": "R004",
+  "severity": "High",
+  "timestamp": "20250826_090104",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

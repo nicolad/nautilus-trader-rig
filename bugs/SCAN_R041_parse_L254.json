@@ -1,0 +1,20 @@
+{
+  "adapter_name": "parse",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R041_parse_L254",
+  "code_sample": "        RecordFlag::F_SNAPSHOT as u8,",
+  "description": "Casting detected: as numeric cast",
+  "file_location": {
+    "column": 32,
+    "line": 254,
+    "relative_path": "../crates/adapters/bitmex/src/websocket/parse.rs"
+  },
+  "fix_suggestion": "Review casting pattern usage",
+  "pattern_id": "R041",
+  "severity": "High",
+  "timestamp": "20250826_112738",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

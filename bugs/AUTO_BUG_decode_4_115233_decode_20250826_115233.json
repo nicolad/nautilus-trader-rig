@@ -1,0 +1,16 @@
+{
+  "adapter_name": "decode",
+  "analysis_context": "Automated detection via Nautilus Trader Rig",
+  "bug_id": "AUTO_BUG_decode_4_115233",
+  "code_sample": "",
+  "description": "The code uses floating-point conversion (f64) for financial calculations when decimals != 18, which can lead to precision loss and financial calculation errors. Floating-point arithmetic is inherently imprecise for decimal values, and this can result in incorrect monetary calculations, rounding errors, and potential financial losses in trading systems. The use of f64 is particularly dangerous for prices and quantities where exact decimal representation is required.",
+  "fix_suggestion": "Replace floating-point conversion with exact decimal arithmetic. Use a decimal arithmetic library (such as rust_decimal) or implement fixed-point arithmetic using integers. For the fallback case (decimals != 18), convert U256 to a big integer representation and then scale it appropriately to the desired precision without going through f64.",
+  "relative_path": "../crates/adapters/blockchain/src/decode.rs",
+  "severity": "CRITICAL",
+  "timestamp": "20250826_115233",
+  "workspace_info": {
+    "branch": "main",
+    "commit_hash": "26614d3961221b67c16f413ed5f2a82da21534d4",
+    "repository": "nautilus_trader"
+  }
+}

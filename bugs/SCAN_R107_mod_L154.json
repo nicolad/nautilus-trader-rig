@@ -1,0 +1,20 @@
+{
+  "adapter_name": "mod",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R107_mod_L154",
+  "code_sample": "                std::thread::sleep(Duration::from_millis(DELAY_MS));",
+  "description": "Concurrency detected: sleep retry",
+  "file_location": {
+    "column": 22,
+    "line": 154,
+    "relative_path": "../crates/adapters/tardis/src/csv/mod.rs"
+  },
+  "fix_suggestion": "Review concurrency pattern usage",
+  "pattern_id": "R107",
+  "severity": "High",
+  "timestamp": "20250826_112745",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

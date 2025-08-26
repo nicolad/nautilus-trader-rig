@@ -48,6 +48,10 @@ hyper = "1.0"
 hyper-util = "0.1"
 tower = "0.5"
 walkdir = "2.4"
+once_cell = "1.19"
+
+[dev-dependencies]
+rstest = "0.21"
 which = "6.0"
 
 [profile.release]

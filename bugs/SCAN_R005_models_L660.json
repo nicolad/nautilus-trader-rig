@@ -1,0 +1,20 @@
+{
+  "adapter_name": "models",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R005_models_L660",
+  "code_sample": "        assert_eq!(",
+  "description": "Panic detected: assert_eq!",
+  "file_location": {
+    "column": 9,
+    "line": 660,
+    "relative_path": "../crates/adapters/coinbase_intx/src/http/models.rs"
+  },
+  "fix_suggestion": "Review panic pattern usage",
+  "pattern_id": "R005",
+  "severity": "High",
+  "timestamp": "20250826_090102",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

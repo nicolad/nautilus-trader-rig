@@ -1,0 +1,20 @@
+{
+  "adapter_name": "enums",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R142_enums_L160",
+  "code_sample": "        Self::iter().map(|x| x.to_string()).collect()",
+  "description": "Performance detected: map(|x| x.to_string())",
+  "file_location": {
+    "column": 21,
+    "line": 160,
+    "relative_path": "../crates/adapters/okx/src/python/enums.rs"
+  },
+  "fix_suggestion": "Review performance pattern usage",
+  "pattern_id": "R142",
+  "severity": "High",
+  "timestamp": "20250826_112736",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "adapter_name": "client",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R140_client_L302",
+  "code_sample": "            let error_body = String::from_utf8_lossy(&resp.body);",
+  "description": "Performance detected: from_utf8_lossy",
+  "file_location": {
+    "column": 38,
+    "line": 302,
+    "relative_path": "../crates/adapters/okx/src/http/client.rs"
+  },
+  "fix_suggestion": "Review performance pattern usage",
+  "pattern_id": "R140",
+  "severity": "High",
+  "timestamp": "20250826_112737",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

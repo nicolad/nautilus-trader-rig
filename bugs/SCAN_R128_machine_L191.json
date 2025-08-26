@@ -1,0 +1,20 @@
+{
+  "adapter_name": "machine",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R128_machine_L191",
+  "code_sample": "            HashMap::new();",
+  "description": "Performance detected: HashMap::new() no capacity",
+  "file_location": {
+    "column": 13,
+    "line": 191,
+    "relative_path": "../crates/adapters/tardis/src/python/machine.rs"
+  },
+  "fix_suggestion": "Review performance pattern usage",
+  "pattern_id": "R128",
+  "severity": "High",
+  "timestamp": "20250826_112744",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "adapter_name": "client",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R126_client_L1165",
+  "code_sample": "                        let mut funding_updates = Vec::new();",
+  "description": "Performance detected: Vec::new() no capacity",
+  "file_location": {
+    "column": 51,
+    "line": 1165,
+    "relative_path": "../crates/adapters/bitmex/src/websocket/client.rs"
+  },
+  "fix_suggestion": "Review performance pattern usage",
+  "pattern_id": "R126",
+  "severity": "High",
+  "timestamp": "20250826_112738",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

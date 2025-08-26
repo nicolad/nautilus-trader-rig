@@ -1,0 +1,20 @@
+{
+  "adapter_name": "helpers",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R009_helpers_L370",
+  "code_sample": "        let log: Log = serde_json::from_value(log_json).expect(\"Failed to deserialize log\");",
+  "description": "ErrorHandling detected: expect()",
+  "file_location": {
+    "column": 56,
+    "line": 370,
+    "relative_path": "../crates/adapters/blockchain/src/hypersync/helpers.rs"
+  },
+  "fix_suggestion": "Review errorhandling pattern usage",
+  "pattern_id": "R009",
+  "severity": "High",
+  "timestamp": "20250826_112743",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

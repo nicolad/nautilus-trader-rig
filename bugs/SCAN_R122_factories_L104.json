@@ -1,0 +1,20 @@
+{
+  "adapter_name": "factories",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R122_factories_L104",
+  "code_sample": "            \"https://eth-mainnet.example.com\".to_string(),",
+  "description": "Performance detected: literal.to_string()",
+  "file_location": {
+    "column": 13,
+    "line": 104,
+    "relative_path": "../crates/adapters/blockchain/src/factories.rs"
+  },
+  "fix_suggestion": "Review performance pattern usage",
+  "pattern_id": "R122",
+  "severity": "High",
+  "timestamp": "20250826_112741",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

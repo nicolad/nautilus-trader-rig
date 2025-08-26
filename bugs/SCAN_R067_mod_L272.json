@@ -1,0 +1,20 @@
+{
+  "adapter_name": "mod",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R067_mod_L272",
+  "code_sample": "    #[allow(dead_code)] // TODO: Under development",
+  "description": "Style detected: TODO comment",
+  "file_location": {
+    "column": 28,
+    "line": 272,
+    "relative_path": "../crates/adapters/blockchain/src/cache/mod.rs"
+  },
+  "fix_suggestion": "Review style pattern usage",
+  "pattern_id": "R067",
+  "severity": "High",
+  "timestamp": "20250826_112742",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

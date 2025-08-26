@@ -1,0 +1,20 @@
+{
+  "adapter_name": "example_http",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R066_example_http_L84",
+  "code_sample": "        println!(\"price_increment={}\", inst.price_increment());",
+  "description": "Style detected: println! left",
+  "file_location": {
+    "column": 9,
+    "line": 84,
+    "relative_path": "../crates/adapters/tardis/bin/example_http.rs"
+  },
+  "fix_suggestion": "Review style pattern usage",
+  "pattern_id": "R066",
+  "severity": "High",
+  "timestamp": "20250826_112744",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

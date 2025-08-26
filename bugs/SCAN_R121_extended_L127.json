@@ -1,0 +1,20 @@
+{
+  "adapter_name": "extended",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R121_extended_L127",
+  "code_sample": "            parse_swap_event_fn(self.dex.clone(), log)",
+  "description": "Performance detected: clone()",
+  "file_location": {
+    "column": 41,
+    "line": 127,
+    "relative_path": "../crates/adapters/blockchain/src/exchanges/extended.rs"
+  },
+  "fix_suggestion": "Review performance pattern usage",
+  "pattern_id": "R121",
+  "severity": "High",
+  "timestamp": "20250826_112742",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

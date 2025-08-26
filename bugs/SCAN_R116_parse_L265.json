@@ -1,0 +1,20 @@
+{
+  "adapter_name": "parse",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R116_parse_L265",
+  "code_sample": "        RecordFlag::F_SNAPSHOT as u8",
+  "description": "Casting detected: float->int as",
+  "file_location": {
+    "column": 32,
+    "line": 265,
+    "relative_path": "../crates/adapters/okx/src/websocket/parse.rs"
+  },
+  "fix_suggestion": "Review casting pattern usage",
+  "pattern_id": "R116",
+  "severity": "High",
+  "timestamp": "20250826_112735",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

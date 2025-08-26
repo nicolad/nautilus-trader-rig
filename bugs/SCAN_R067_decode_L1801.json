@@ -1,0 +1,20 @@
+{
+  "adapter_name": "decode",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R067_decode_L1801",
+  "code_sample": "    // TODO: Re-enable these tests once proper CBBO test data is available",
+  "description": "Style detected: TODO comment",
+  "file_location": {
+    "column": 8,
+    "line": 1801,
+    "relative_path": "../crates/adapters/databento/src/decode.rs"
+  },
+  "fix_suggestion": "Review style pattern usage",
+  "pattern_id": "R067",
+  "severity": "High",
+  "timestamp": "20250826_112747",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

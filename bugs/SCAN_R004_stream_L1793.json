@@ -1,0 +1,20 @@
+{
+  "adapter_name": "stream",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R004_stream_L1793",
+  "code_sample": "        assert!(stream.next().is_none());",
+  "description": "Panic detected: assert!",
+  "file_location": {
+    "column": 9,
+    "line": 1793,
+    "relative_path": "../crates/adapters/tardis/src/csv/stream.rs"
+  },
+  "fix_suggestion": "Review panic pattern usage",
+  "pattern_id": "R004",
+  "severity": "High",
+  "timestamp": "20250826_090107",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

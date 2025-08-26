@@ -1,0 +1,20 @@
+{
+  "adapter_name": "types",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R077_types_L16",
+  "code_sample": "use chrono::NaiveDate;",
+  "description": "Time detected: NaiveDateTime",
+  "file_location": {
+    "column": 5,
+    "line": 16,
+    "relative_path": "../crates/adapters/tardis/src/machine/types.rs"
+  },
+  "fix_suggestion": "Review time pattern usage",
+  "pattern_id": "R077",
+  "severity": "High",
+  "timestamp": "20250826_112745",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

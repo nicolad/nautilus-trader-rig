@@ -1,0 +1,20 @@
+{
+  "adapter_name": "data",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R083_data_L228",
+  "code_sample": "        let (cmd_tx, cmd_rx) = tokio::sync::mpsc::unbounded_channel();",
+  "description": "Concurrency detected: tokio::mpsc::unbounded_channel()",
+  "file_location": {
+    "column": 32,
+    "line": 228,
+    "relative_path": "../crates/adapters/databento/src/data.rs"
+  },
+  "fix_suggestion": "Review concurrency pattern usage",
+  "pattern_id": "R083",
+  "severity": "High",
+  "timestamp": "20250826_112747",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

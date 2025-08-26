@@ -1,0 +1,20 @@
+{
+  "adapter_name": "stream_deltas_bench",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R066_stream_deltas_bench_L70",
+  "code_sample": "    println!(",
+  "description": "Style detected: println! left",
+  "file_location": {
+    "column": 5,
+    "line": 70,
+    "relative_path": "../crates/adapters/tardis/bin/stream_deltas_bench.rs"
+  },
+  "fix_suggestion": "Review style pattern usage",
+  "pattern_id": "R066",
+  "severity": "High",
+  "timestamp": "20250826_112744",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

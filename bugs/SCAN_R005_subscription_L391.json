@@ -1,0 +1,20 @@
+{
+  "adapter_name": "subscription",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R005_subscription_L391",
+  "code_sample": "        assert_eq!(swap_sig.len(), 66); // 0x + 64 hex chars (32 bytes)",
+  "description": "Panic detected: assert_eq!",
+  "file_location": {
+    "column": 9,
+    "line": 391,
+    "relative_path": "../crates/adapters/blockchain/src/data/subscription.rs"
+  },
+  "fix_suggestion": "Review panic pattern usage",
+  "pattern_id": "R005",
+  "severity": "High",
+  "timestamp": "20250826_090105",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

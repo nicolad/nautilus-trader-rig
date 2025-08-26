@@ -1,0 +1,20 @@
+{
+  "adapter_name": "testing",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R009_testing_L28",
+  "code_sample": "    std::fs::read_to_string(path).expect(\"Failed to read test JSON file\")",
+  "description": "ErrorHandling detected: expect()",
+  "file_location": {
+    "column": 34,
+    "line": 28,
+    "relative_path": "../crates/adapters/bitmex/src/common/testing.rs"
+  },
+  "fix_suggestion": "Review errorhandling pattern usage",
+  "pattern_id": "R009",
+  "severity": "High",
+  "timestamp": "20250826_112739",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

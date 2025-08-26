@@ -1,0 +1,20 @@
+{
+  "adapter_name": "database",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R116_database_L347",
+  "code_sample": "        .bind(dex.factory_creation_block as i64)",
+  "description": "Casting detected: float->int as",
+  "file_location": {
+    "column": 42,
+    "line": 347,
+    "relative_path": "../crates/adapters/blockchain/src/cache/database.rs"
+  },
+  "fix_suggestion": "Review casting pattern usage",
+  "pattern_id": "R116",
+  "severity": "High",
+  "timestamp": "20250826_112742",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

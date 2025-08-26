@@ -1,0 +1,20 @@
+{
+  "adapter_name": "client",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R008_client_L316",
+  "code_sample": "                status: StatusCode::from_u16(resp.status.as_u16()).unwrap(),",
+  "description": "ErrorHandling detected: unwrap()",
+  "file_location": {
+    "column": 67,
+    "line": 316,
+    "relative_path": "../crates/adapters/okx/src/http/client.rs"
+  },
+  "fix_suggestion": "Review errorhandling pattern usage",
+  "pattern_id": "R008",
+  "severity": "High",
+  "timestamp": "20250826_112737",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

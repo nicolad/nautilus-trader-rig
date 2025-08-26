@@ -1,0 +1,20 @@
+{
+  "adapter_name": "client",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R122_client_L187",
+  "code_sample": "        headers.insert(\"CB-ACCESS-PASSPHRASE\".to_string(), api_passphrase);",
+  "description": "Performance detected: literal.to_string()",
+  "file_location": {
+    "column": 24,
+    "line": 187,
+    "relative_path": "../crates/adapters/coinbase_intx/src/http/client.rs"
+  },
+  "fix_suggestion": "Review performance pattern usage",
+  "pattern_id": "R122",
+  "severity": "High",
+  "timestamp": "20250826_112741",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

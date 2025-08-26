@@ -1,0 +1,20 @@
+{
+  "adapter_name": "math",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R004_math_L314",
+  "code_sample": "        assert!((result - 1_234_567_890.123_456_7).abs() < 1.0); // Some precision loss expected",
+  "description": "Panic detected: assert!",
+  "file_location": {
+    "column": 9,
+    "line": 314,
+    "relative_path": "../crates/adapters/blockchain/src/math.rs"
+  },
+  "fix_suggestion": "Review panic pattern usage",
+  "pattern_id": "R004",
+  "severity": "High",
+  "timestamp": "20250826_090104",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

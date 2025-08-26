@@ -1,0 +1,20 @@
+{
+  "adapter_name": "mod",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R041_mod_L283",
+  "code_sample": "                let expected_len = (last - first + 1) as usize;",
+  "description": "Casting detected: as numeric cast",
+  "file_location": {
+    "column": 55,
+    "line": 283,
+    "relative_path": "../crates/adapters/blockchain/src/cache/mod.rs"
+  },
+  "fix_suggestion": "Review casting pattern usage",
+  "pattern_id": "R041",
+  "severity": "High",
+  "timestamp": "20250826_112742",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

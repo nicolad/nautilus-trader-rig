@@ -1,0 +1,20 @@
+{
+  "adapter_name": "client",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R124_client_L205",
+  "code_sample": "        let account_id = AccountId::new(format!(\"{COINBASE_INTX}-{}\", self.portfolio_id));",
+  "description": "Performance detected: format!(one slot)",
+  "file_location": {
+    "column": 41,
+    "line": 205,
+    "relative_path": "../crates/adapters/coinbase_intx/src/fix/client.rs"
+  },
+  "fix_suggestion": "Review performance pattern usage",
+  "pattern_id": "R124",
+  "severity": "High",
+  "timestamp": "20250826_112741",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

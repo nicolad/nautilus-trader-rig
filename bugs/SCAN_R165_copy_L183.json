@@ -1,0 +1,20 @@
+{
+  "adapter_name": "copy",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R165_copy_L183",
+  "code_sample": "            let base_fee_bytes = base_fee.to_string().as_bytes().to_vec();",
+  "description": "Performance detected: to_vec()",
+  "file_location": {
+    "column": 65,
+    "line": 183,
+    "relative_path": "../crates/adapters/blockchain/src/cache/copy.rs"
+  },
+  "fix_suggestion": "Review performance pattern usage",
+  "pattern_id": "R165",
+  "severity": "High",
+  "timestamp": "20250826_112741",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

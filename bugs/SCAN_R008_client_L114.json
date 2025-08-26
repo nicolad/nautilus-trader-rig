@@ -1,0 +1,20 @@
+{
+  "adapter_name": "client",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R008_client_L114",
+  "code_sample": "    LazyLock::new(|| Quota::per_second(NonZeroU32::new(250).unwrap()));",
+  "description": "ErrorHandling detected: unwrap()",
+  "file_location": {
+    "column": 60,
+    "line": 114,
+    "relative_path": "../crates/adapters/okx/src/websocket/client.rs"
+  },
+  "fix_suggestion": "Review errorhandling pattern usage",
+  "pattern_id": "R008",
+  "severity": "High",
+  "timestamp": "20250826_112735",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

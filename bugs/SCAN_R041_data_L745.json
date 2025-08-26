@@ -1,0 +1,20 @@
+{
+  "adapter_name": "data",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R041_data_L745",
+  "code_sample": "                    .map_or(0, |dt| dt.timestamp_nanos_opt().unwrap_or(0) as u64)",
+  "description": "Casting detected: as numeric cast",
+  "file_location": {
+    "column": 75,
+    "line": 745,
+    "relative_path": "../crates/adapters/databento/src/data.rs"
+  },
+  "fix_suggestion": "Review casting pattern usage",
+  "pattern_id": "R041",
+  "severity": "High",
+  "timestamp": "20250826_112747",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

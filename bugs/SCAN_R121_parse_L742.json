@@ -1,0 +1,20 @@
+{
+  "adapter_name": "parse",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R121_parse_L742",
+  "code_sample": "        let inst1 = instruments[1].clone();",
+  "description": "Performance detected: clone()",
+  "file_location": {
+    "column": 35,
+    "line": 742,
+    "relative_path": "../crates/adapters/tardis/src/http/parse.rs"
+  },
+  "fix_suggestion": "Review performance pattern usage",
+  "pattern_id": "R121",
+  "severity": "High",
+  "timestamp": "20250826_112744",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

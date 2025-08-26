@@ -1,0 +1,20 @@
+{
+  "adapter_name": "decode",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R184_decode_L1403",
+  "code_sample": "            Err(e) => assert_eq!(Err(e.to_string().as_str()), expected),",
+  "description": "Performance detected: to_string().as_str()",
+  "file_location": {
+    "column": 39,
+    "line": 1403,
+    "relative_path": "../crates/adapters/databento/src/decode.rs"
+  },
+  "fix_suggestion": "Review performance pattern usage",
+  "pattern_id": "R184",
+  "severity": "High",
+  "timestamp": "20250826_112747",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "adapter_name": "client",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R121_client_L190",
+  "code_sample": "        let signal = self.signal.clone();",
+  "description": "Performance detected: clone()",
+  "file_location": {
+    "column": 33,
+    "line": 190,
+    "relative_path": "../crates/adapters/bitmex/src/websocket/client.rs"
+  },
+  "fix_suggestion": "Review performance pattern usage",
+  "pattern_id": "R121",
+  "severity": "High",
+  "timestamp": "20250826_112738",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

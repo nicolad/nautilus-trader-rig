@@ -1,0 +1,20 @@
+{
+  "adapter_name": "parse",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R116_parse_L217",
+  "code_sample": "    let ts_event = UnixNanos::from(event_nanos as u64);",
+  "description": "Casting detected: float->int as",
+  "file_location": {
+    "column": 48,
+    "line": 217,
+    "relative_path": "../crates/adapters/tardis/src/machine/parse.rs"
+  },
+  "fix_suggestion": "Review casting pattern usage",
+  "pattern_id": "R116",
+  "severity": "High",
+  "timestamp": "20250826_112746",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

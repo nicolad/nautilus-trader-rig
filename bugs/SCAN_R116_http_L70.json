@@ -1,0 +1,20 @@
+{
+  "adapter_name": "http",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R116_http_L70",
+  "code_sample": "            // .available_since(start.map(|x| DateTime::from_timestamp_nanos(x as i64)))",
+  "description": "Casting detected: float->int as",
+  "file_location": {
+    "column": 80,
+    "line": 70,
+    "relative_path": "../crates/adapters/tardis/src/python/http.rs"
+  },
+  "fix_suggestion": "Review casting pattern usage",
+  "pattern_id": "R116",
+  "severity": "High",
+  "timestamp": "20250826_112744",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

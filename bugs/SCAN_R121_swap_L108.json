@@ -1,0 +1,20 @@
+{
+  "adapter_name": "swap",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R121_swap_L108",
+  "code_sample": "            self.transaction_hash.clone(),",
+  "description": "Performance detected: clone()",
+  "file_location": {
+    "column": 34,
+    "line": 108,
+    "relative_path": "../crates/adapters/blockchain/src/events/swap.rs"
+  },
+  "fix_suggestion": "Review performance pattern usage",
+  "pattern_id": "R121",
+  "severity": "High",
+  "timestamp": "20250826_112743",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

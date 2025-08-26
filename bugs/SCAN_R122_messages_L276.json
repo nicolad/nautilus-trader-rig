@@ -1,0 +1,20 @@
+{
+  "adapter_name": "messages",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R122_messages_L276",
+  "code_sample": "        assert_eq!(parsed.position_size_limit, Some(\"5841.0594\".to_string()));",
+  "description": "Performance detected: literal.to_string()",
+  "file_location": {
+    "column": 53,
+    "line": 276,
+    "relative_path": "../crates/adapters/coinbase_intx/src/websocket/messages.rs"
+  },
+  "fix_suggestion": "Review performance pattern usage",
+  "pattern_id": "R122",
+  "severity": "High",
+  "timestamp": "20250826_112740",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

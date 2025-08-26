@@ -1,0 +1,20 @@
+{
+  "adapter_name": "models",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R101_models_L774",
+  "code_sample": "    use super::*;",
+  "description": "Style detected: glob import",
+  "file_location": {
+    "column": 5,
+    "line": 774,
+    "relative_path": "../crates/adapters/bitmex/src/http/models.rs"
+  },
+  "fix_suggestion": "Review style pattern usage",
+  "pattern_id": "R101",
+  "severity": "High",
+  "timestamp": "20250826_112739",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}

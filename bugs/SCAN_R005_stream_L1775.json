@@ -1,0 +1,20 @@
+{
+  "adapter_name": "stream",
+  "analysis_context": "Automated pattern detection",
+  "bug_id": "SCAN_R005_stream_L1775",
+  "code_sample": "        assert_eq!(chunk2[0].size, Quantity::from(\"1000\"));",
+  "description": "Panic detected: assert_eq!",
+  "file_location": {
+    "column": 9,
+    "line": 1775,
+    "relative_path": "../crates/adapters/tardis/src/csv/stream.rs"
+  },
+  "fix_suggestion": "Review panic pattern usage",
+  "pattern_id": "R005",
+  "severity": "High",
+  "timestamp": "20250826_090107",
+  "workspace_info": {
+    "branch": "develop",
+    "repository": "nautilus_trader"
+  }
+}
