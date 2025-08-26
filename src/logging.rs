@@ -310,27 +310,10 @@ macro_rules! log_performance {
     };
 }
 
-/// Log system status
-macro_rules! log_status {
-    (success, $message:expr) => {
-        tracing::info!("✅ {}", $message);
-    };
-    (warning, $message:expr) => {
-        tracing::warn!("⚠️ {}", $message);
-    };
-    (error, $message:expr) => {
-        tracing::error!("❌ {}", $message);
-    };
-    (info, $message:expr) => {
-        tracing::info!("ℹ️ {}", $message);
-    };
-}
-
 // Re-export macros for use in other modules
 pub(crate) use log_directory_op;
 pub(crate) use log_file_processing;
 pub(crate) use log_mcp_op;
-pub(crate) use log_status;
 
 #[cfg(test)]
 mod tests {

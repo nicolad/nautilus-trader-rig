@@ -2448,54 +2448,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "nautilus_trader_rig"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "apalis",
- "apalis-cron",
- "axum",
- "base64 0.22.1",
- "bincode",
- "cargo_metadata",
- "chrono",
- "dotenvy",
- "env_logger",
- "fastembed",
- "fs_extra",
- "futures",
- "hyper",
- "hyper-util",
- "log",
- "octocrab",
- "once_cell",
- "pathdiff",
- "rayon",
- "regex",
- "reqwest",
- "rig-core",
- "rig-fastembed",
- "rig-sqlite",
- "rmcp",
- "rstest",
- "rusqlite",
- "rustls 0.23.31",
- "schemars",
- "serde",
- "serde_json",
- "sqlite-vec",
- "sqlx",
- "tempfile",
- "tokio",
- "tokio-rusqlite",
- "tower 0.5.2",
- "tracing",
- "tracing-subscriber",
- "walkdir",
- "which 6.0.3",
-]
-
-[[package]]
 name = "ndarray"
 version = "0.16.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3531,6 +3483,54 @@ dependencies = [
  "tokio-rusqlite",
  "tracing",
  "zerocopy",
+]
+
+[[package]]
+name = "rig_bug_finder"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "apalis",
+ "apalis-cron",
+ "axum",
+ "base64 0.22.1",
+ "bincode",
+ "cargo_metadata",
+ "chrono",
+ "dotenvy",
+ "env_logger",
+ "fastembed",
+ "fs_extra",
+ "futures",
+ "hyper",
+ "hyper-util",
+ "log",
+ "octocrab",
+ "once_cell",
+ "pathdiff",
+ "rayon",
+ "regex",
+ "reqwest",
+ "rig-core",
+ "rig-fastembed",
+ "rig-sqlite",
+ "rmcp",
+ "rstest",
+ "rusqlite",
+ "rustls 0.23.31",
+ "schemars",
+ "serde",
+ "serde_json",
+ "sqlite-vec",
+ "sqlx",
+ "tempfile",
+ "tokio",
+ "tokio-rusqlite",
+ "tower 0.5.2",
+ "tracing",
+ "tracing-subscriber",
+ "walkdir",
+ "which 6.0.3",
 ]
 
 [[package]]

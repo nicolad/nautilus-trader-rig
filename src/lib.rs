@@ -15,7 +15,7 @@ pub mod vector_store;
 pub use config::Config;
 pub use deepseek::DeepSeekClient;
 pub use logging::init_dev_logging;
-pub use vector_store::VectorStoreManager;
+pub use vector_store::{VectorStoreManager, classify_local_first, PatternSpec, Decision};
 
 // Re-export bug detection API
 pub use false_positive_filter::{

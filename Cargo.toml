@@ -1,11 +1,11 @@
 [package]
-name = "nautilus_trader_rig"
+name = "rig_bug_finder"
 version = "0.1.0"
 edition = "2021"
-default-run = "nautilus_trader_rig"
+default-run = "rig_bug_finder"
 
 [[bin]]
-name = "nautilus_trader_rig"
+name = "rig_bug_finder"
 path = "src/main.rs"
 
 [dependencies]

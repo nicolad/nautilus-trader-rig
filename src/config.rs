@@ -12,6 +12,9 @@ impl Config {
     /// Path to the environment file (relative to crate dir)
     pub const ENV_FILE_PATH: &'static str = ".env";
 
+    /// Environment variable name for rig repository path
+    pub const RIG_REPO_PATH_ENV: &'static str = "REPO_PATH";
+
     /// Default MCP server port
     pub const DEFAULT_MCP_PORT: u16 = 3000;
 
@@ -91,6 +94,19 @@ impl Config {
         Self::logs_directory().join(format!("nautilus_trader_rig_{}.log", timestamp))
     }
 
+    /// Get the rig repository path from environment variable, or default
+    pub fn rig_repo_path() -> std::path::PathBuf {
+        if let Ok(path) = std::env::var(Self::RIG_REPO_PATH_ENV) {
+            std::path::PathBuf::from(path)
+        } else {
+            // Default fallback: assume rig repo is adjacent to current repo
+            Self::manifest_dir()
+                .parent()
+                .unwrap_or(Self::manifest_dir())
+                .join("rig")
+        }
+    }
+
     /// Get the full path to the Rust adapters directory
     pub fn rust_adapters_directory() -> &'static Path {
         Path::new(Self::CORE_ADAPTERS_DIRECTORY)
@@ -118,16 +134,55 @@ impl Config {
 
     /// Absolute paths for Rust adapter directories (preferred for robust execution)
     pub fn all_rust_adapter_directories_abs() -> Vec<std::path::PathBuf> {
-        let base = Self::manifest_dir();
-        vec![
-            base.join("../crates/adapters"),
-            base.join("../crates/adapters"), // kept twice to mirror existing API semantics
-        ]
+        if std::env::var(Self::RIG_REPO_PATH_ENV).is_ok() {
+            // Use rig repo from environment variable
+            let rig_path = Self::rig_repo_path();
+            vec![
+                rig_path.join("rig-core/src"),
+                rig_path.join("rig-bedrock/src"),
+                rig_path.join("rig-eternalai/src"),
+                rig_path.join("rig-fastembed/src"),
+                rig_path.join("rig-lancedb/src"),
+                rig_path.join("rig-milvus/src"),
+                rig_path.join("rig-mongodb/src"),
+                rig_path.join("rig-neo4j/src"),
+                rig_path.join("rig-postgres/src"),
+                rig_path.join("rig-qdrant/src"),
+                rig_path.join("rig-s3vectors/src"),
+                rig_path.join("rig-scylladb/src"),
+                rig_path.join("rig-sqlite/src"),
+                rig_path.join("rig-surrealdb/src"),
+                rig_path.join("rig-wasm/src"),
+            ]
+        } else {
+            // Fallback to original hardcoded paths
+            let base = Self::manifest_dir();
+            vec![
+                base.join("../crates/adapters"),
+                base.join("../crates/adapters"), // kept twice to mirror existing API semantics
+            ]
+        }
     }
 
     /// Absolute path to core adapters directory
     pub fn core_adapters_directory_abs() -> std::path::PathBuf {
-        Self::manifest_dir().join("../crates/adapters")
+        if std::env::var(Self::RIG_REPO_PATH_ENV).is_ok() {
+            // Use rig repo from environment variable
+            Self::rig_repo_path().join("rig-core/src")
+        } else {
+            // Fallback to original hardcoded path
+            Self::manifest_dir().join("../crates/adapters")
+        }
+    }
+
+    /// Check if rig repository path environment variable is set
+    pub fn rig_repo_path_env_set() -> bool {
+        std::env::var(Self::RIG_REPO_PATH_ENV).is_ok()
+    }
+
+    /// Get the current value of the rig repository path environment variable (if set)
+    pub fn rig_repo_path_env_value() -> Option<String> {
+        std::env::var(Self::RIG_REPO_PATH_ENV).ok()
     }
 
     /// Get list of supported Rust file extensions

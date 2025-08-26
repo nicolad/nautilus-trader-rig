@@ -2,11 +2,15 @@
 //! 
 //! This module uses FastEmbed for local embeddings (no API key required) with in-memory or SQLite storage.
 //! Embeddings are generated locally using the AllMiniLML6V2 model.
+//! Also includes local-first classification functionality with LLM fallback.
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use std::path::Path;
-use tracing::{debug, info, trace};
+use std::collections::HashMap;
+use tracing::{debug, info, trace, warn};
 use serde::{Deserialize, Serialize};
+use schemars::JsonSchema;
+use crate::deepseek::DeepSeekClient;
 
 use fastembed::{
     EmbeddingModel as FastembedModel, Pooling, TextEmbedding as FastembedTextEmbedding,
@@ -272,6 +276,359 @@ impl VectorStoreManager {
             .cloned()
             .collect())
     }
+}
+
+// ========== CLASSIFICATION FUNCTIONALITY ==========
+
+/// A pattern label + examples. Provide 3-8 concise examples per label for best results.
+#[derive(Debug, Clone)]
+pub struct PatternSpec {
+    pub label: String,
+    pub description: Option<String>,
+    pub examples: Vec<String>,
+}
+
+/// Document we embed & store in the vector index for classification.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct PatternExample {
+    pub id: String,
+    pub label: String,
+    pub text: String,
+    pub embedding: Option<Vec<f32>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct LlmDecision {
+    /// Either one of the provided labels, or "NONE"
+    pub label: String,
+    /// 0.0..=1.0 model-estimated confidence
+    pub confidence: f32,
+    /// Short human-readable rationale
+    pub reason: String,
+}
+
+#[derive(Debug, Clone)]
+pub enum Decision {
+    Match {
+        label: String,
+        score: f32,
+        reason: String,
+        via: &'static str, // "embeddings" | "deepseek"
+    },
+    NoMatch {
+        score: f32,       // best embedding score we saw
+        reason: String,   // why we declined
+    },
+}
+
+// --------- Tunables ---------
+
+const TOP_K: usize = 6;       // search this many nearest examples
+const MIN_SCORE: f64 = 0.68;  // absolute floor for a confident local match (cosine)
+const MARGIN: f64 = 0.04;     // how much top label must beat the runner-up
+
+// --------- Simple pattern index using basic similarity ---------
+
+struct PatternIndex {
+    examples: Vec<PatternExample>,
+    labels: Vec<String>,
+}
+
+async fn build_index(specs: &[PatternSpec]) -> Result<PatternIndex> {
+    // Prepare documents (examples) 
+    let mut examples: Vec<PatternExample> = Vec::new();
+    for (li, spec) in specs.iter().enumerate() {
+        for (ei, ex) in spec.examples.iter().enumerate() {
+            examples.push(PatternExample {
+                id: format!("L{li}_E{ei}"),
+                label: spec.label.clone(),
+                text: ex.trim().to_owned(),
+                embedding: None, // We'll use simple text matching for now
+            });
+        }
+    }
+
+    Ok(PatternIndex {
+        examples,
+        labels: specs.iter().map(|s| s.label.clone()).collect(),
+    })
+}
+
+// --------- Simple text similarity (placeholder for embeddings) ---------
+
+fn simple_similarity(text1: &str, text2: &str) -> f64 {
+    // Very basic similarity based on common words
+    let text1_lower = text1.to_lowercase();
+    let text2_lower = text2.to_lowercase();
+    let words1: std::collections::HashSet<&str> = text1_lower.split_whitespace().collect();
+    let words2: std::collections::HashSet<&str> = text2_lower.split_whitespace().collect();
+    
+    let intersection = words1.intersection(&words2).count();
+    let union = words1.union(&words2).count();
+    
+    if union == 0 {
+        0.0
+    } else {
+        intersection as f64 / union as f64
+    }
+}
+
+async fn coarse_match(
+    index: &PatternIndex,
+    input: &str,
+) -> Result<(Option<(String, f64, String)>, f64, Vec<(String, f64)>)> {
+    // Calculate similarity scores for all examples
+    let mut scores: Vec<(f64, &PatternExample)> = index
+        .examples
+        .iter()
+        .map(|example| {
+            let score = simple_similarity(input, &example.text);
+            (score, example)
+        })
+        .collect();
+
+    // Sort by score descending
+    scores.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
+
+    if scores.is_empty() {
+        return Ok((None, 0.0, vec![]));
+    }
+
+    // Take top K results
+    let top_results: Vec<(f64, &PatternExample)> = scores.into_iter().take(TOP_K).collect();
+
+    // Aggregate best score per label and keep an example for rationale
+    let mut best: HashMap<String, (f64, String)> = HashMap::new();
+    let mut all_best: Vec<(String, f64)> = vec![];
+
+    for (score, example) in top_results {
+        match best.get(&example.label) {
+            Some(&(existing, _)) if existing >= score => {}
+            _ => {
+                best.insert(example.label.clone(), (score, example.text.clone()));
+            }
+        }
+    }
+
+    // Rank labels by their best example score
+    let mut label_scores: Vec<(String, f64, String)> = best
+        .into_iter()
+        .map(|(label, (s, ex))| (label, s, ex))
+        .collect();
+
+    label_scores.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+
+    let top_score = label_scores.first().map(|x| x.1).unwrap_or(0.0);
+    let top: Option<(String, f64, String)> = label_scores.first().cloned();
+
+    // For auditability, return the top-N label scores as well
+    for (label, score, _ex) in label_scores.iter().take(5) {
+        all_best.push((label.clone(), *score));
+    }
+
+    Ok((top, top_score, all_best))
+}
+
+// --------- DeepSeek tie-break (JSON-only, parsed with serde) ---------
+
+fn extract_json_block(s: &str) -> Option<&str> {
+    // Be robust to models that wrap JSON in prose/fences.
+    let start = s.find('{')?;
+    let end = s.rfind('}')?;
+    if end > start {
+        Some(&s[start..=end])
+    } else {
+        None
+    }
+}
+
+async fn llm_tiebreak_with_deepseek(
+    ds: &DeepSeekClient,
+    labels: &[String],
+    input: &str,
+    descriptions: &HashMap<String, String>,
+) -> Result<LlmDecision> {
+    let label_list = labels.join(", ");
+    let mut label_table = String::new();
+    for l in labels {
+        let desc = descriptions.get(l).map(|s| s.as_str()).unwrap_or("");
+        if desc.is_empty() {
+            label_table.push_str(&format!("- {l}\n"));
+        } else {
+            label_table.push_str(&format!("- {l}: {desc}\n"));
+        }
+    }
+
+    // Strong JSON-only instruction; model-agnostic.
+    let prompt = format!(
+        "You are a STRICT classifier. Your job is to assign the input to ONE label or \"NONE\".\n\
+         Allowed labels: {label_list}\n\
+         Label overview:\n{label_table}\n\
+         RULES:\n\
+         - Consider semantics, not substrings.\n\
+         - Prefer precision over recall.\n\
+         - If nothing fits well, use label \"NONE\".\n\
+         - OUTPUT ONLY VALID JSON (no backticks, no explanations), matching this schema exactly:\n\
+         {{\"label\": string, \"confidence\": number (0..1), \"reason\": string}}\n\
+         Now classify the INPUT below.\n\n\
+         INPUT:\n{input}\n"
+    );
+
+    let raw = ds
+        .prompt_with_context(&prompt, "LocalFirst-Classifier")
+        .await?;
+
+    // Try direct parse; then fallback to extracting a JSON block.
+    match serde_json::from_str::<LlmDecision>(&raw) {
+        Ok(dec) => Ok(dec),
+        Err(_) => {
+            let json = extract_json_block(&raw).ok_or_else(|| {
+                anyhow!("DeepSeek returned non-JSON answer and no JSON block could be found")
+            })?;
+            let dec: LlmDecision = serde_json::from_str(json)?;
+            Ok(dec)
+        }
+    }
+}
+
+/// Local-first classifier:
+/// 1) try embeddings-only; 2) if ambiguous, consult DeepSeek via your client wrapper.
+pub async fn classify_local_first(
+    specs: &[PatternSpec],
+    input: &str,
+    deepseek: Option<&DeepSeekClient>, // None => skip LLM
+) -> Result<Decision> {
+    let index = build_index(specs).await?;
+
+    // Build map of label -> description for the LLM step
+    let mut descs: HashMap<String, String> = HashMap::new();
+    for s in specs {
+        if let Some(d) = &s.description {
+            descs.insert(s.label.clone(), d.clone());
+        }
+    }
+
+    // Coarse local-only match
+    let (top, top_score, ranked) = coarse_match(&index, input).await?;
+
+    if let Some((label, score, example)) = top {
+        // Grab runner-up
+        let second = ranked.get(1).map(|(_, s)| *s).unwrap_or(0.0);
+
+        info!("coarse ranked: {:?}", ranked);
+
+        // Accept if the top label is clearly best
+        if score >= MIN_SCORE && (score - second) >= MARGIN {
+            return Ok(Decision::Match {
+                label,
+                score: score as f32,
+                reason: format!(
+                    "Local embeddings agreed confidently (score={:.3}, margin over next={:.3}). Example: {}",
+                    score, score - second, example
+                ),
+                via: "embeddings",
+            });
+        }
+    }
+
+    // Otherwise, ambiguous; try DeepSeek if provided
+    if let Some(ds) = deepseek {
+        match llm_tiebreak_with_deepseek(ds, &index.labels, input, &descs).await {
+            Ok(dec) => {
+                if dec.label == "NONE" {
+                    return Ok(Decision::NoMatch {
+                        score: top_score as f32,
+                        reason: format!("DeepSeek declined to classify. LLM says: {}", dec.reason),
+                    });
+                } else {
+                    return Ok(Decision::Match {
+                        label: dec.label,
+                        score: dec.confidence,
+                        reason: dec.reason,
+                        via: "deepseek",
+                    });
+                }
+            }
+            Err(e) => {
+                warn!("DeepSeek tie-break failed: {e:?}");
+                // Fall back to "no match" but report embedding best-score
+                return Ok(Decision::NoMatch {
+                    score: top_score as f32,
+                    reason: "Ambiguous by embeddings and DeepSeek tie-break unavailable.".to_string(),
+                });
+            }
+        }
+    }
+
+    // LLM not allowed / not provided
+    Ok(Decision::NoMatch {
+        score: top_score as f32,
+        reason: "Ambiguous by embeddings; DeepSeek tie-break disabled.".to_string(),
+    })
+}
+
+/// Demo function that can be called from main or tests
+pub async fn run_classification_demo() -> Result<()> {
+    info!("🧠 Running classification demo...");
+
+    // NOTE: The DeepSeek step is optional; if you don't set DEEPSEEK_API_KEY,
+    // we'll run embeddings-only and return NoMatch on ambiguity.
+    let deepseek = DeepSeekClient::from_env().ok();
+
+    // Example patterns (replace with your own domain)
+    let specs = vec![
+        PatternSpec {
+            label: "ORDER_ID".to_string(),
+            description: Some("Alphanumeric order identifiers like ORD-12345, PO#998877".to_string()),
+            examples: vec![
+                "Please check order ORD-12345 status".to_string(),
+                "po#998877 needs an address update".to_string(),
+                "ship this as order 77-ABC-432".to_string(),
+            ],
+        },
+        PatternSpec {
+            label: "ERROR_LOG".to_string(),
+            description: Some("Application errors with codes/messages".to_string()),
+            examples: vec![
+                "ERROR [E042] null pointer at module:auth".to_string(),
+                "FATAL: db timeout code=DBT-504".to_string(),
+                "warn: retrying connection, code=ECONNRESET".to_string(),
+            ],
+        },
+        PatternSpec {
+            label: "GREETING".to_string(),
+            description: Some("Human salutations".to_string()),
+            examples: vec![
+                "hey team, quick question".to_string(),
+                "hello there!".to_string(),
+                "good morning everyone".to_string(),
+            ],
+        },
+    ];
+
+    let inputs = vec![
+        "Can you re-route PO#998877 to warehouse B?",
+        "FATAL: db timeout code=DBT-504 after 30s",
+        "morning folks — deploy passed ✅",
+        "unknown shape: maybe a tracking ref 99-XY but not sure",
+    ];
+
+    for text in inputs {
+        let decision = classify_local_first(&specs, text, deepseek.as_ref()).await?;
+        info!("\nINPUT: {text}");
+        match decision {
+            Decision::Match { label, score, reason, via } => {
+                info!("→ MATCH: {label}  (score {:.3}, via {via})", score);
+                info!("  reason: {reason}");
+            }
+            Decision::NoMatch { score, reason } => {
+                info!("→ NO MATCH (best local score {:.3})", score);
+                info!("  reason: {reason}");
+            }
+        }
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]

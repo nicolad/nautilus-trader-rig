@@ -47,48 +47,85 @@ impl FalsePositiveFilter {
             known_patterns: HashMap::new(),
             validation_cache: HashMap::new(),
         };
-        
+
         filter.initialize_known_patterns();
         filter
     }
 
     fn initialize_known_patterns(&mut self) {
         // R005: assert_eq! in tests
-        self.known_patterns.insert("R005".to_string(), FalsePositivePattern {
-            pattern_id: "R005".to_string(),
-            context_keywords: vec!["#[test]".to_string(), "#[cfg(test)]".to_string(), "mod tests".to_string()],
-            common_false_positives: vec!["assert_eq!".to_string(), "assert_ne!".to_string()],
-            confidence_threshold: 0.8,
-        });
+        self.known_patterns.insert(
+            "R005".to_string(),
+            FalsePositivePattern {
+                pattern_id: "R005".to_string(),
+                context_keywords: vec![
+                    "#[test]".to_string(),
+                    "#[cfg(test)]".to_string(),
+                    "mod tests".to_string(),
+                ],
+                common_false_positives: vec!["assert_eq!".to_string(), "assert_ne!".to_string()],
+                confidence_threshold: 0.8,
+            },
+        );
 
         // R085: let _ = for non-Result types
-        self.known_patterns.insert("R085".to_string(), FalsePositivePattern {
-            pattern_id: "R085".to_string(),
-            context_keywords: vec!["tuple".to_string(), "struct".to_string(), "len()".to_string()],
-            common_false_positives: vec!["let _ = (", "let _ = struct", "let _ = x.len()"].iter().map(|s| s.to_string()).collect(),
-            confidence_threshold: 0.7,
-        });
+        self.known_patterns.insert(
+            "R085".to_string(),
+            FalsePositivePattern {
+                pattern_id: "R085".to_string(),
+                context_keywords: vec![
+                    "tuple".to_string(),
+                    "struct".to_string(),
+                    "len()".to_string(),
+                ],
+                common_false_positives: ["let _ = (", "let _ = struct", "let _ = x.len()"]
+                    .iter()
+                    .map(|s| s.to_string())
+                    .collect(),
+                confidence_threshold: 0.7,
+            },
+        );
 
         // R001: panic! in test code
-        self.known_patterns.insert("R001".to_string(), FalsePositivePattern {
-            pattern_id: "R001".to_string(),
-            context_keywords: vec!["#[test]".to_string(), "#[should_panic]".to_string(), "test_".to_string()],
-            common_false_positives: vec!["panic!(\"test".to_string(), "panic!(\"Test".to_string()],
-            confidence_threshold: 0.9,
-        });
+        self.known_patterns.insert(
+            "R001".to_string(),
+            FalsePositivePattern {
+                pattern_id: "R001".to_string(),
+                context_keywords: vec![
+                    "#[test]".to_string(),
+                    "#[should_panic]".to_string(),
+                    "test_".to_string(),
+                ],
+                common_false_positives: vec![
+                    "panic!(\"test".to_string(),
+                    "panic!(\"Test".to_string(),
+                ],
+                confidence_threshold: 0.9,
+            },
+        );
 
         // R030: TODO comments in development
-        self.known_patterns.insert("R030".to_string(), FalsePositivePattern {
-            pattern_id: "R030".to_string(),
-            context_keywords: vec!["// TODO:".to_string(), "/* TODO".to_string()],
-            common_false_positives: vec!["TODO: implement".to_string(), "TODO: add tests".to_string()],
-            confidence_threshold: 0.6,
-        });
+        self.known_patterns.insert(
+            "R030".to_string(),
+            FalsePositivePattern {
+                pattern_id: "R030".to_string(),
+                context_keywords: vec!["// TODO:".to_string(), "/* TODO".to_string()],
+                common_false_positives: vec![
+                    "TODO: implement".to_string(),
+                    "TODO: add tests".to_string(),
+                ],
+                confidence_threshold: 0.6,
+            },
+        );
     }
 
-    pub async fn validate_issue(&mut self, issue: &Issue, file_content: &str) -> Result<ValidationResult> {
+    pub async fn validate_issue(
+        &mut self,
+        issue: &Issue,
+        file_content: &str,
+    ) -> Result<ValidationResult> {
         let cache_key = format!("{}:{}:{}", issue.pattern_id, issue.line, issue.excerpt);
-        
+
         // Check cache first
         if let Some(cached_result) = self.validation_cache.get(&cache_key) {
             debug!("Using cached validation result for {}", issue.pattern_id);
@@ -97,37 +134,42 @@ impl FalsePositiveFilter {
 
         // Quick heuristic check
         if let Some(quick_result) = self.quick_heuristic_check(issue, file_content) {
-            self.validation_cache.insert(cache_key.clone(), quick_result.clone());
+            self.validation_cache
+                .insert(cache_key.clone(), quick_result.clone());
             return Ok(quick_result);
         }
 
         // DeepSeek validation
         let validation_result = if let Some(deepseek) = &self.deepseek_client {
-            self.deepseek_validation(issue, file_content, deepseek).await?
+            self.deepseek_validation(issue, file_content, deepseek)
+                .await?
         } else {
             // Fallback to pattern-based validation
             self.pattern_based_validation(issue, file_content)
         };
 
         // Cache the result
-        self.validation_cache.insert(cache_key, validation_result.clone());
+        self.validation_cache
+            .insert(cache_key, validation_result.clone());
         Ok(validation_result)
     }
 
     fn quick_heuristic_check(&self, issue: &Issue, file_content: &str) -> Option<ValidationResult> {
         if let Some(pattern) = self.known_patterns.get(issue.pattern_id) {
             let issue_line = file_content.lines().nth(issue.line.saturating_sub(1))?;
-            let context_lines: Vec<&str> = file_content.lines()
+            let context_lines: Vec<&str> = file_content
+                .lines()
                 .skip(issue.line.saturating_sub(6))
                 .take(10)
                 .collect();
-            
+
             let context_text = context_lines.join("\n");
-            
+
             // Check for test context
-            let is_in_test_context = pattern.context_keywords.iter().any(|keyword| {
-                context_text.contains(keyword) || issue_line.contains(keyword)
-            });
+            let is_in_test_context = pattern
+                .context_keywords
+                .iter()
+                .any(|keyword| context_text.contains(keyword) || issue_line.contains(keyword));
 
             // Check for known false positive patterns
             let matches_false_positive = pattern.common_false_positives.iter().any(|fp_pattern| {
@@ -138,35 +180,45 @@ impl FalsePositiveFilter {
                 return Some(ValidationResult {
                     is_false_positive: true,
                     confidence: pattern.confidence_threshold,
-                    reasoning: format!("Detected {} in test context with known false positive pattern", issue.pattern_id),
+                    reasoning: format!(
+                        "Detected {} in test context with known false positive pattern",
+                        issue.pattern_id
+                    ),
                     suggested_action: SuggestedAction::Ignore,
                 });
             }
 
             // Special case for R085: check if it's actually discarding a Result
-            if issue.pattern_id == "R085" {
-                if !issue_line.contains("Result<") && !context_text.contains("-> Result<") {
-                    return Some(ValidationResult {
-                        is_false_positive: true,
-                        confidence: 0.8,
-                        reasoning: "let _ = pattern not applied to Result type".to_string(),
-                        suggested_action: SuggestedAction::Ignore,
-                    });
-                }
+            if issue.pattern_id == "R085"
+                && !issue_line.contains("Result<")
+                && !context_text.contains("-> Result<")
+            {
+                return Some(ValidationResult {
+                    is_false_positive: true,
+                    confidence: 0.8,
+                    reasoning: "let _ = pattern not applied to Result type".to_string(),
+                    suggested_action: SuggestedAction::Ignore,
+                });
             }
         }
 
         None
     }
 
-    async fn deepseek_validation(&self, issue: &Issue, file_content: &str, deepseek: &DeepSeekClient) -> Result<ValidationResult> {
-        let context_lines: Vec<&str> = file_content.lines()
+    async fn deepseek_validation(
+        &self,
+        issue: &Issue,
+        file_content: &str,
+        deepseek: &DeepSeekClient,
+    ) -> Result<ValidationResult> {
+        let context_lines: Vec<&str> = file_content
+            .lines()
             .skip(issue.line.saturating_sub(10))
             .take(20)
             .collect();
-        
+
         let context = context_lines.join("\n");
-        
+
         let validation_prompt = format!(
             r#"Analyze this Rust code pattern detection result for false positives:
 
@@ -197,7 +249,10 @@ Be conservative - only mark as false positive if you're confident it's safe."#,
             issue.name,
             issue.excerpt,
             issue.line,
-            file_content.lines().nth(issue.line.saturating_sub(1)).unwrap_or(""),
+            file_content
+                .lines()
+                .nth(issue.line.saturating_sub(1))
+                .unwrap_or(""),
             context
         );
 
@@ -220,24 +275,35 @@ Be conservative - only mark as false positive if you're confident it's safe."#,
     }
 
     fn parse_deepseek_response(&self, response: &str) -> Result<ValidationResult> {
-        let is_false_positive = response.lines()
+        let is_false_positive = response
+            .lines()
             .find(|line| line.starts_with("FALSE_POSITIVE:"))
             .and_then(|line| line.split(':').nth(1))
             .map(|s| s.trim().to_lowercase() == "yes")
             .unwrap_or(false);
 
-        let confidence = response.lines()
+        let confidence = response
+            .lines()
             .find(|line| line.starts_with("CONFIDENCE:"))
             .and_then(|line| line.split(':').nth(1))
             .and_then(|s| s.trim().parse::<f32>().ok())
             .unwrap_or(0.5);
 
-        let reasoning = response.lines()
+        let reasoning = response
+            .lines()
             .find(|line| line.starts_with("REASONING:"))
-            .map(|line| line.split(':').skip(1).collect::<Vec<_>>().join(":").trim().to_string())
+            .map(|line| {
+                line.split(':')
+                    .skip(1)
+                    .collect::<Vec<_>>()
+                    .join(":")
+                    .trim()
+                    .to_string()
+            })
             .unwrap_or_else(|| "No reasoning provided".to_string());
 
-        let suggested_action = response.lines()
+        let suggested_action = response
+            .lines()
             .find(|line| line.starts_with("ACTION:"))
             .and_then(|line| line.split(':').nth(1))
             .map(|s| match s.trim().to_uppercase().as_str() {
@@ -261,13 +327,17 @@ Be conservative - only mark as false positive if you're confident it's safe."#,
         match issue.pattern_id {
             "R005" | "R006" | "R007" | "R008" => {
                 // Assert patterns in test context
-                let context = file_content.lines()
+                let context = file_content
+                    .lines()
                     .skip(issue.line.saturating_sub(20))
                     .take(40)
                     .collect::<Vec<_>>()
                     .join("\n");
-                
-                if context.contains("#[test]") || context.contains("#[cfg(test)]") || context.contains("mod tests") {
+
+                if context.contains("#[test]")
+                    || context.contains("#[cfg(test)]")
+                    || context.contains("mod tests")
+                {
                     ValidationResult {
                         is_false_positive: true,
                         confidence: 0.8,
@@ -285,7 +355,10 @@ Be conservative - only mark as false positive if you're confident it's safe."#,
             }
             "R085" => {
                 // let _ = pattern validation
-                let line = file_content.lines().nth(issue.line.saturating_sub(1)).unwrap_or("");
+                let line = file_content
+                    .lines()
+                    .nth(issue.line.saturating_sub(1))
+                    .unwrap_or("");
                 if line.contains("Result<") || line.contains("()") {
                     ValidationResult {
                         is_false_positive: false,
@@ -307,13 +380,15 @@ Be conservative - only mark as false positive if you're confident it's safe."#,
                 confidence: 0.5,
                 reasoning: "No specific validation rule available".to_string(),
                 suggested_action: SuggestedAction::Review,
-            }
+            },
         }
     }
 
     pub fn get_validation_stats(&self) -> (usize, usize) {
         let total = self.validation_cache.len();
-        let false_positives = self.validation_cache.values()
+        let false_positives = self
+            .validation_cache
+            .values()
             .filter(|v| v.is_false_positive)
             .count();
         (total, false_positives)
@@ -360,7 +435,7 @@ impl ValidatedIssue {
     pub fn new(issue: Issue, validation: ValidationResult) -> Self {
         let is_valid = !validation.is_false_positive;
         let confidence = validation.confidence;
-        
+
         Self {
             issue: issue.into(),
             is_valid,

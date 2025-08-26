@@ -85,7 +85,7 @@ fn trim_excerpt(line: &str) -> String {
         line.to_string()
     } else {
         let mut s = line[..MAX].to_string();
-        s.push_str("…");
+        s.push('…');
         s
     }
 }
